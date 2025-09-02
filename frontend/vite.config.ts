@@ -7,14 +7,18 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // Base path for Netlify (leave "/" if deploying to root domain)
+  base: "/",
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8000",  // your backend
+        target: "http://localhost:8000", // your backend for local dev
         changeOrigin: true,
         secure: false,
       },
     },
   },
+  build: {
+    outDir: "dist", // Netlify expects this
+  },
 });
-
