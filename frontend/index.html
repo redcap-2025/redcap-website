@@ -1,15 +1,25 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Use your RedCap.png as favicon -->
-    <link rel="icon" type="image/png" href="../assets/images/RedCap.png" />
-    <!-- Optional: fallback for older browsers -->
-    <link rel="icon" type="image/x-icon" href="frontend/assets/images/RedCap.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=2.0" />
-    <title>RedCap Logistics Landing Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="RedCap Logistics - Fast, Secure, and Reliable Package Delivery Service" />
+    <meta name="theme-color" content="#DC2626" />
+    <title>RedCap Logistics</title>
+
+    <!-- Favicon: Correct path (must be in /public folder) -->
+    <link rel="icon" type="image/png" href="/RedCap.png" />
+    <!-- Optional: Add multiple sizes for better support -->
+    <link rel="apple-touch-icon" href="/RedCap.png" sizes="180x180" />
+    <link rel="icon" type="image/png" href="/RedCap.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/RedCap.png" sizes="16x16" />
+
+    <!-- Preload font or critical assets if needed -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
