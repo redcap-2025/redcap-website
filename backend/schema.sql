@@ -1,9 +1,12 @@
 -- 1. Create the database (run only once)
+-- Note: On Railway, you usually can't USE a custom DB unless configured
+-- This may be skipped if using default `railway` database
 CREATE DATABASE IF NOT EXISTS redcap_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE redcap_db;
+-- Remove or comment out USE if not supported (common on Railway)
+-- USE redcap_db;
 
 -- 2. Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -21,8 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   resetToken VARCHAR(255),
   resetTokenExpiration DATETIME,
-  INDEX (email)
-);
+  INDEX idx_users_email (email)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 3. Bookings Table
 CREATE TABLE IF NOT EXISTS bookings (
@@ -61,5 +64,12 @@ CREATE TABLE IF NOT EXISTS bookings (
   deliverystatus VARCHAR(100) DEFAULT 'Not Assigned',
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
+  -- Foreign key constraint
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-);
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_bookings_userId ON bookings(userId);
+CREATE INDEX IF NOT EXISTS idx_bookings_trackingCode ON bookings(trackingCode);
+
+-- ✅ All done! No sample data inserted.
