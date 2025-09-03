@@ -1,12 +1,21 @@
 {
   "name": "react-mysql-backend",
   "version": "1.0.0",
-  "description": "Node.js + Express backend with MySQL for React app",
+  "description": "Node.js + Express backend with MySQL for React app, deployed on Railway",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+  "keywords": [
+    "express",
+    "mysql",
+    "backend",
+    "api",
+    "railway"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
@@ -17,7 +26,6 @@
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.3",
     "nodemailer": "^7.0.6",
-    "nodeman": "^1.1.2",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

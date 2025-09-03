@@ -1,8 +1,11 @@
--- Create database (run this only once if DB doesn't exist)
-CREATE DATABASE IF NOT EXISTS redcap_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- 1. Create the database (run only once)
+CREATE DATABASE IF NOT EXISTS redcap_db
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
 USE redcap_db;
 
--- Users table
+-- 2. Users Table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   fullName VARCHAR(100) NOT NULL,
@@ -16,16 +19,19 @@ CREATE TABLE IF NOT EXISTS users (
   state VARCHAR(100),
   pincode VARCHAR(20),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  resetToken VARCHAR(255) NULL,
-  resetTokenExpiration datetime null
+  resetToken VARCHAR(255),
+  resetTokenExpiration DATETIME,
+  INDEX (email)
 );
 
--- Bookings table
-CREATE TABLE bookings (
+-- 3. Bookings Table
+CREATE TABLE IF NOT EXISTS bookings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userId INT NOT NULL,
-  trackingCode VARCHAR(50) NOT NULL,
-  status VARCHAR(20) NOT NULL,
+  trackingCode VARCHAR(50) NOT NULL UNIQUE,
+  status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+  
+  -- Pickup Info
   pickupName VARCHAR(100),
   pickupPhone VARCHAR(20),
   pickupDoorNumber VARCHAR(50),
@@ -34,6 +40,8 @@ CREATE TABLE bookings (
   pickupCity VARCHAR(100),
   pickupState VARCHAR(100),
   pickupPincode VARCHAR(20),
+
+  -- Dropoff Info
   dropoffName VARCHAR(100),
   dropoffPhone VARCHAR(20),
   dropoffDoorNumber VARCHAR(50),
@@ -42,11 +50,16 @@ CREATE TABLE bookings (
   dropoffCity VARCHAR(100),
   dropoffState VARCHAR(100),
   dropoffPincode VARCHAR(20),
+
+  -- Package Info
   packageContents TEXT,
   packageType VARCHAR(100),
   vehicleType VARCHAR(50),
   serviceType VARCHAR(50),
+
   pickupAt DATETIME,
-  deliverystatus varchar(100),
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  deliverystatus VARCHAR(100) DEFAULT 'Not Assigned',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
