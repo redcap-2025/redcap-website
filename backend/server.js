@@ -1,10 +1,14 @@
 // server.js
+// server.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const pool = require('./config/db'); // MySQL pool
 
+// ✅ Move this BEFORE requiring db
 dotenv.config();
+
+// ✅ Now safe to require db
+const pool = require('./config/db');
 
 const app = express();
 
@@ -14,7 +18,7 @@ const allowedOrigins = [
   'http://localhost:5000',
   'http://127.0.0.1:5000',
   'http://localhost:3000',
-  'https://recapweb.netlify.app', 
+  'https://recapweb.netlify.app', // ✅ No spaces
 ];
 
 // Use REACT_APP_FRONTEND_URL if set and valid
@@ -48,12 +52,7 @@ app.use((req, res, next) => {
 
 // Health check endpoint (for Render/monitoring)
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Server is running on Render with MySQL!',
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  });
+  res.status(200).json({ success: true, message: 'Server is running...' });
 });
 
 // API routes
