@@ -41,7 +41,8 @@ class ApiService {
         );
       }
 
-      const  T & { success?: boolean; error?: string } = await response.json();
+      // ✅ Fixed syntax error: Added 'data' variable name
+      const data: T & { success?: boolean; error?: string } = await response.json();
 
       // ✅ Handle API-level errors (400, 401, 500 with JSON body)
       if (!response.ok) {
@@ -67,7 +68,7 @@ class ApiService {
     }
   }
 
-  // 🔹 REGISTER - Fixed route to include /auth
+  // 🔹 REGISTER - Fixed route structure
   async register(userData: {
     fullName: string;
     email: string;
@@ -85,7 +86,7 @@ class ApiService {
       user: any;
       token: string;
       error?: string;
-    }>("/api/auth/register", {  // ✅ Fixed: Added /auth segment
+    }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(userData),
     });
@@ -97,14 +98,14 @@ class ApiService {
     return response;
   }
 
-  // 🔹 LOGIN - Fixed route to include /auth
+  // 🔹 LOGIN - Fixed route structure
   async login(email: string, password: string) {
     const response = await this.request<{
       success: boolean;
       user: any;
       token: string;
       error?: string;
-    }>("/api/auth/login", {  // ✅ Fixed: Added /auth segment
+    }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -116,23 +117,23 @@ class ApiService {
     return response;
   }
 
-  // 🔹 FORGOT PASSWORD - Fixed route to include /auth
+  // 🔹 FORGOT PASSWORD - Fixed route structure
   async forgotPassword(email: string) {
     return await this.request<{
       success: boolean;
       message: string;
-    }>("/api/auth/forgot-password", {  // ✅ Fixed: Added /auth segment
+    }>("/api/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
     });
   }
 
-  // 🔹 RESET PASSWORD - Fixed route to include /auth
+  // 🔹 RESET PASSWORD - Fixed route structure
   async resetPassword(token: string, email: string, password: string) {
     return await this.request<{
       success: boolean;
       message: string;
-    }>("/api/auth/reset-password", {  // ✅ Fixed: Added /auth segment
+    }>("/api/auth/reset-password", {
       method: "POST",
       body: JSON.stringify({ token, email, password }),
     });
@@ -143,7 +144,7 @@ class ApiService {
     return await this.request<{
       success: boolean;
       message: string;
-    }>("/api/auth/verify-reset-token", {  // ✅ Fixed: Added /auth segment
+    }>("/api/auth/verify-reset-token", {
       method: "POST",
       body: JSON.stringify({ token, email }),
     });
@@ -151,7 +152,7 @@ class ApiService {
 
   // 🔹 PROFILE
   async getProfile() {
-    return await this.request<any>("/api/profile");
+    return await this.request<{ success: boolean; user: any }>("/api/profile");
   }
 
   async updateProfile(userData: {
@@ -164,15 +165,37 @@ class ApiService {
     state: string;
     pincode: string;
   }) {
-    return await this.request<any>("/api/profile", {
+    return await this.request<{ success: boolean; user: any }>("/api/profile", {
       method: "PUT",
       body: JSON.stringify(userData),
     });
   }
 
   // 🔹 BOOKINGS
-  async createBooking(bookingData: any) {
-    return await this.request<any>("/api/bookings", {
+  async createBooking(bookingData: {
+    senderName: string;
+    senderPhone: string;
+    pickupDoorNumber: string;
+    pickupBuildingName?: string;
+    pickupStreet: string;
+    pickupCity: string;
+    pickupState: string;
+    pickupPincode: string;
+    receiverName: string;
+    receiverPhone: string;
+    deliveryDoorNumber: string;
+    deliveryBuildingName?: string;
+    deliveryStreet: string;
+    deliveryCity: string;
+    deliveryState: string;
+    deliveryPincode: string;
+    description?: string;
+    packageType: string;
+    vehicleType: string;
+    serviceType?: string;
+    pickupDate: string;
+  }) {
+    return await this.request<{ success: boolean; booking: any }>("/api/bookings", {
       method: "POST",
       body: JSON.stringify(bookingData),
     });
@@ -180,6 +203,10 @@ class ApiService {
 
   async getUserBookings() {
     return await this.request<{ success: boolean; bookings: any[] }>("/api/bookings");
+  }
+
+  async getBookingById(id: string) {
+    return await this.request<{ success: boolean; booking: any }>(`/api/bookings/${id}`);
   }
 
   // 🔹 HEALTH CHECK
