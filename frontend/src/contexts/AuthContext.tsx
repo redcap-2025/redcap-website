@@ -1,7 +1,7 @@
-// AuthProvider.tsx
+// contexts/AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthState } from "../types/user";
-import { apiService } from "../services/api"; // ← Make sure path is correct
+import { apiService } from "../services/api"; // ✅ CORRECTED IMPORT PATH
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -86,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
 
+    // ✅ Ensure password is defined (fixes TypeScript error)
     if (!userData.email || !userData.password || !userData.fullName || !userData.phone) {
       setError("All fields are required");
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -93,7 +94,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const response = await apiService.register(userData);
+      const response = await apiService.register({
+        ...userData,
+        password: userData.password // TypeScript now knows it's defined
+      });
+      
       if (!response.success || !response.user || !response.token) {
         throw new Error(response.error || "Registration failed");
       }
@@ -117,8 +122,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authState.user) return;
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
+    
     try {
-      const updated = await apiService.updateProfile(userData);
+      // ✅ Filter out undefined values (fixes TypeScript error)
+      const filteredUserData = Object.fromEntries(
+        Object.entries(userData).filter(([_, value]) => value !== undefined)
+      ) as Partial<User>;
+      
+      const updated = await apiService.updateProfile(filteredUserData);
       const updatedUser = { ...authState.user, ...updated };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
@@ -135,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       const data = await apiService.getProfile();
-      const mergedUser = { ...authState.user, ...data } as User;
+      const mergedUser = { ...authState.user, ...data.user } as User;
       localStorage.setItem("redcap_user", JSON.stringify(mergedUser));
       setAuthState({ isAuthenticated: true, user: mergedUser, loading: false });
     } catch (err: any) {
@@ -148,19 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const forgotPassword = async (email: string) => {
     setError(null);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-      const url = `${API_BASE_URL}/api/forgot-password`; // ✅ Correct variable used
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to send reset link");
-      }
+      await apiService.forgotPassword(email);
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -171,19 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (token: string, newPassword: string, email: string) => {
     setError(null);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"; // ✅ No trailing spaces
-      const url = `${API_BASE_URL}/api/reset-password`; // ✅ Correct URL
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password: newPassword }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to reset password");
-      }
+      await apiService.resetPassword(token, email, newPassword);
     } catch (err: any) {
       setError(err.message);
       throw err;

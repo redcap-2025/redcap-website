@@ -46,7 +46,9 @@ class ApiService {
 
       // ✅ Handle API-level errors (400, 401, 500 with JSON body)
       if (!response.ok) {
-        const errorMsg = data?.error || response.statusText || "Request failed";
+        const errorMsg = data?.error || 
+          (response.status === 404 ? "Endpoint not found. Check API route structure." : response.statusText) || 
+          "Request failed";
         throw new Error(errorMsg);
       }
 
@@ -68,12 +70,12 @@ class ApiService {
     }
   }
 
-  // 🔹 REGISTER - Fixed route structure
+  // 🔹 REGISTER - Fixed route structure and TypeScript issues
   async register(userData: {
     fullName: string;
     email: string;
     phone: string;
-    password: string;
+    password: string;  // Now required (handled by frontend validation)
     doorNumber: string;
     buildingName?: string;
     street: string;
@@ -156,14 +158,14 @@ class ApiService {
   }
 
   async updateProfile(userData: {
-    fullName: string;
-    phone: string;
-    doorNumber: string;
+    fullName?: string;
+    phone?: string;
+    doorNumber?: string;
     buildingName?: string;
-    street: string;
-    city: string;
-    state: string;
-    pincode: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
   }) {
     return await this.request<{ success: boolean; user: any }>("/api/profile", {
       method: "PUT",
