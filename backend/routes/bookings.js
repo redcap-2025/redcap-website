@@ -1,10 +1,10 @@
 // backend/routes/bookings.js
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+const db = require("../config/db"); // Ensure correct path
 const auth = require("../middleware/auth");
 
-/** Helper: tracking code */
+/** Helper: Generate tracking code */
 function makeTrackingCode() {
   const rand = Math.floor(Math.random() * 36 ** 4)
     .toString(36)
@@ -13,7 +13,7 @@ function makeTrackingCode() {
   return `RC${Date.now().toString(36).toUpperCase()}${rand}`;
 }
 
-/** Coerce empty strings to null so they store cleanly */
+/** Coerce empty strings to null */
 const nn = (v) => (v === "" || v === undefined ? null : v);
 
 /** Minimal body validation */
@@ -21,15 +21,15 @@ function requireFields(obj, fields) {
   return fields.filter((f) => !obj[f] && obj[f] !== 0 && obj[f] !== false);
 }
 
-/** 🔀 Transform frontend fields → DB schema fields */
+/** Map frontend fields → DB schema */
 function mapToDb(body, userId, trackingCode, status, serviceType) {
   return [
     userId,
     trackingCode,
     status,
 
-    nn(body.senderName),                // pickupName
-    nn(body.senderPhone),               // pickupPhone
+    nn(body.senderName),
+    nn(body.senderPhone),
     nn(body.pickupDoorNumber),
     nn(body.pickupBuildingName),
     nn(body.pickupStreet),
@@ -37,8 +37,8 @@ function mapToDb(body, userId, trackingCode, status, serviceType) {
     nn(body.pickupState),
     nn(body.pickupPincode),
 
-    nn(body.receiverName),              // dropoffName
-    nn(body.receiverPhone),             // dropoffPhone
+    nn(body.receiverName),
+    nn(body.receiverPhone),
     nn(body.deliveryDoorNumber),
     nn(body.deliveryBuildingName),
     nn(body.deliveryStreet),
@@ -46,24 +46,20 @@ function mapToDb(body, userId, trackingCode, status, serviceType) {
     nn(body.deliveryState),
     nn(body.deliveryPincode),
 
-    nn(body.description),               // packageContents
+    nn(body.description),
     nn(body.packageType),
     nn(body.vehicleType),
     serviceType,
-    nn(body.pickupDate),                // pickupAt
+    nn(body.pickupDate),
   ];
 }
 
-/**
- * POST /api/bookings
- * Create a booking
- */
+// 🔹 POST /api/bookings - Create a new booking
 router.post("/bookings", auth, async (req, res) => {
   try {
     const body = req.body || {};
     const userId = req.user.id;
 
-    // Required frontend fields
     const required = [
       "senderName",
       "senderPhone",
@@ -72,7 +68,6 @@ router.post("/bookings", auth, async (req, res) => {
       "pickupCity",
       "pickupState",
       "pickupPincode",
-
       "receiverName",
       "receiverPhone",
       "deliveryDoorNumber",
@@ -80,14 +75,13 @@ router.post("/bookings", auth, async (req, res) => {
       "deliveryCity",
       "deliveryState",
       "deliveryPincode",
-
       "vehicleType",
       "packageType",
       "pickupDate",
     ];
 
     const missing = requireFields(body, required);
-    if (missing.length) {
+    if (missing.length > 0) {
       return res.status(400).json({
         success: false,
         message: `Missing required fields: ${missing.join(", ")}`,
@@ -95,97 +89,70 @@ router.post("/bookings", auth, async (req, res) => {
     }
 
     const trackingCode = makeTrackingCode();
-    const status = "Pending"; // default
+    const status = "Pending";
     const serviceType = nn(body.serviceType);
 
-    // DB columns
     const cols = [
-      "userId",
-      "trackingCode",
-      "status",
-
-      "pickupName",
-      "pickupPhone",
-      "pickupDoorNumber",
-      "pickupBuildingName",
-      "pickupStreet",
-      "pickupCity",
-      "pickupState",
-      "pickupPincode",
-
-      "dropoffName",
-      "dropoffPhone",
-      "dropoffDoorNumber",
-      "dropoffBuildingName",
-      "dropoffStreet",
-      "dropoffCity",
-      "dropoffState",
-      "dropoffPincode",
-
-      "packageContents",
-      "packageType",
-      "vehicleType",
-      "serviceType",
-      "pickupAt",
+      "userId", "trackingCode", "status",
+      "pickupName", "pickupPhone", "pickupDoorNumber", "pickupBuildingName",
+      "pickupStreet", "pickupCity", "pickupState", "pickupPincode",
+      "dropoffName", "dropoffPhone", "dropoffDoorNumber", "dropoffBuildingName",
+      "dropoffStreet", "dropoffCity", "dropoffState", "dropoffPincode",
+      "packageContents", "packageType", "vehicleType", "serviceType", "pickupAt"
     ];
 
     const values = mapToDb(body, userId, trackingCode, status, serviceType);
     const placeholders = cols.map(() => "?").join(",");
-    const insertSql = `INSERT INTO bookings (${cols.join(",")}) VALUES (${placeholders})`;
+    const insertSql = `INSERT INTO bookings (${cols.join(", ")}) VALUES (${placeholders})`;
 
-    // Insert booking
-    const [result] = await db.query(insertSql, values);
+    // Use execute() for better security and connection stability
+    const [result] = await db.execute(insertSql, values);
 
-    // Fetch inserted row
-    const [rows] = await db.query(
+    // Fetch the created booking
+    const [rows] = await db.execute(
       `SELECT * FROM bookings WHERE id = ? AND userId = ?`,
       [result.insertId, userId]
     );
 
     return res.json({ success: true, booking: rows[0] });
   } catch (err) {
-    console.error("❌ Create booking error:", err);
+    console.error("❌ Create booking error:", err.message);
     return res.status(500).json({
       success: false,
-      message: err?.sqlMessage || err?.message || "Server error",
+      message: err.sqlMessage || err.message || "Server error"
     });
   }
 });
 
-/**
- * GET /api/bookings
- * Get all bookings for user
- */
+// 🔹 GET /api/bookings - Get all user bookings
 router.get("/bookings", auth, async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const [rows] = await db.execute(
       `SELECT * FROM bookings WHERE userId = ? ORDER BY createdAt DESC`,
       [req.user.id]
     );
-    res.json({ success: true, bookings: rows });
+    return res.json({ success: true, bookings: rows });
   } catch (err) {
-    console.error("❌ Fetch bookings error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Fetch bookings error:", err.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-/**
- * GET /api/bookings/:id
- * Get one booking by ID
- */
+// 🔹 GET /api/bookings/:id - Get single booking
 router.get("/bookings/:id", auth, async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const { id } = req.params;
+    const [rows] = await db.execute(
       `SELECT * FROM bookings WHERE id = ? AND userId = ?`,
-      [req.params.id, req.user.id]
+      [id, req.user.id]
     );
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: "Not found" });
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
     }
-    res.json({ success: true, booking: rows[0] });
+    return res.json({ success: true, booking: rows[0] });
   } catch (err) {
-    console.error("❌ Fetch booking error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Fetch booking error:", err.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 

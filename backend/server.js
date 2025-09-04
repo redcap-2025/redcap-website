@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -7,21 +8,29 @@ dotenv.config();
 
 const app = express();
 
-// CORS configuration
+// ✅ CORS: Fix trailing space and validate REACT_APP_FRONTEND_URL
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://localhost:3000',
+  'https://recapweb.netlify.app', // 🔴 Removed trailing spaces
+];
+
+// Use REACT_APP_FRONTEND_URL if set and valid
+if (process.env.REACT_APP_FRONTEND_URL && !allowedOrigins.includes(process.env.REACT_APP_FRONTEND_URL)) {
+  allowedOrigins.push(process.env.REACT_APP_FRONTEND_URL);
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5000',
-      'http://127.0.0.1:5000',
-      'http://localhost:3000',
-      'https://recapweb.netlify.app',  // ✅ No spaces!
-      process.env.REACT_APP_FRONTEND_URL
-    ];
+    // Allow requests with no origin (like mobile apps, curl)
+    if (!origin) return callback(null, true);
 
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`❌ Blocked CORS request from: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -37,41 +46,42 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
+// Health check endpoint (for Render/monitoring)
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
-    message: 'Server is running on Railway with MySQL!',
+    message: 'Server is running on Render with MySQL!',
     timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
   });
 });
 
 // API routes
-app.use('/api', require('./routes/auth'));
-app.use('/api', require('./routes/profile'));
-app.use('/api', require('./routes/bookings'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/profile', require('./routes/profile'));
+app.use('/api/bookings', require('./routes/bookings'));
 
-// Check DB connection
+// ✅ Validate DB connection on startup
 pool.getConnection()
-  .then(() => {
-    console.log('✅ Connected to MySQL:', {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      database: process.env.DB_NAME,
-    });
+  .then(connection => {
+    console.log('✅ Connected to MySQL database');
+    console.log(`👉 Host: ${process.env.MYSQLHOST}:${process.env.MYSQLPORT}`);
+    connection.release();
   })
   .catch(err => {
-    console.error('❌ MySQL connection failed:', err.message);
-    process.exit(1); // Exit if DB fails on startup
+    console.error('❌ MySQL connection failed at startup:', err.message);
+    console.error('💡 Check: MYSQLHOST, MYSQLPORT, SSL, and env vars in Render Dashboard');
+    process.exit(1); // Crash early if DB is unreachable
   });
 
-// Start server
+// ✅ Bind to 0.0.0.0 and use PORT (Required by Render)
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT} (Railway hosting)`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`🌍 Available via Render at: https://${process.env.RENDER_EXTERNAL_HOSTNAME}`);
 });
 
-// Global error handlers
+// 🔐 Global error handlers
 process.on('uncaughtException', (err) => {
   console.error('🔥 Uncaught Exception:', err);
   process.exit(1);

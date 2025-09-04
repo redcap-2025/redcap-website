@@ -1,29 +1,49 @@
 // db.js
 const mysql = require('mysql2/promise');
 
+// 🔒 Validate required environment variables
+if (!process.env.MYSQLHOST || !process.env.MYSQLPORT || !process.env.MYSQLUSER || !process.env.MYSQLPASSWORD) {
+  console.error('❌ Missing required MySQL environment variables. Check Render dashboard.');
+  process.exit(1);
+}
+
 const pool = mysql.createPool({
-  host: process.env.MYSQLHOST || process.env.DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.MYSQLPORT || process.env.DB_PORT || '3306'),
-  user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
-  password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
-  database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'railway',
+  host: process.env.MYSQLHOST,
+  port: parseInt(process.env.MYSQLPORT),
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE || 'railway',
+  ssl: {
+    rejectUnauthorized: false // 🔐 Required for Railway's proxy.rlwy.net
+  },
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: process.env.NODE_ENV === 'production' 
-    ? { rejectUnauthorized: false } // Use with caution; better to verify CA in prod
-    : undefined,
+  enableKeepAlive: true,        // 💡 Prevent idle timeout
+  keepAliveInitialDelay: 1000,  // ms
 });
 
-// Test connection
+// ✅ Test connection on startup
 pool.getConnection()
   .then(connection => {
-    console.log('✅ Connected to MySQL database');
+    console.log('✅ Successfully connected to MySQL database');
+    console.log(`👉 Host: ${process.env.MYSQLHOST}:${process.env.MYSQLPORT}`);
     connection.release();
   })
   .catch(err => {
     console.error('❌ MySQL connection failed:', err.message);
-    console.error('Check your DB_HOST, DB_USER, DB_PASSWORD, and network access.');
+    console.error('💡 Check: DB_HOST, DB_PORT, SSL, and network access.');
+    console.error('🔧 Ensure env vars are set in Render Dashboard (not .env file).');
   });
+
+// 🛡️ Optional: Handle pool errors
+pool.on('error', (err) => {
+  console.error('⚠️ MySQL Pool Error:', err.message);
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    console.log('🔄 Reconnecting...');
+    // Let Render restart the service if needed
+    process.exit(1);
+  }
+});
 
 module.exports = pool;
