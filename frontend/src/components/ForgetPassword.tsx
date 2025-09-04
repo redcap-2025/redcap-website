@@ -13,40 +13,58 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [loading, setLoading] = useState(false);
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  clearError();
-  setMessage("");
-  setMessageType("");
-  setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    setMessage("");
+    setMessageType("");
+    setLoading(true);
 
-  try {
-    await forgotPassword(email);
-    setMessage("✅ Password reset link has been sent to your email.");
-    setMessageType("success");
-  } catch (err: any) {
-    let errorMsg = err?.message || "❌ Failed to send reset link. Please try again.";
-
-    // 🔀 Handle invalid email specifically
-    if (
-      errorMsg.toLowerCase().includes("not found") ||
-      errorMsg.toLowerCase().includes("invalid") ||
-      errorMsg.toLowerCase().includes("no user")
-    ) {
-      errorMsg = "❌ This email is not registered with us.";
+    // Validate email format
+    if (!email) {
+      setMessage("❌ Email is required.");
+      setMessageType("error");
+      setLoading(false);
+      return;
     }
 
-    setMessage(errorMsg);
-    setMessageType("error");
-  } finally {
-    setLoading(false);
-  }
-};
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setMessage("❌ Please enter a valid email address.");
+      setMessageType("error");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await forgotPassword(email);
+      setMessage("✅ Password reset link has been sent to your email.");
+      setMessageType("success");
+    } catch (err: any) {
+      let errorMsg = err?.message || "❌ Failed to send reset link. Please try again.";
+
+      // Handle common backend issues gracefully
+      if (errorMsg.includes("token '<'")) {
+        errorMsg =
+          "❌ Unable to connect to server. Please check your internet connection.";
+      } else if (
+        errorMsg.toLowerCase().includes("not found") ||
+        errorMsg.toLowerCase().includes("invalid") ||
+        errorMsg.toLowerCase().includes("no user")
+      ) {
+        errorMsg = "❌ This email is not registered with us.";
+      }
+
+      setMessage(errorMsg);
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Back button */}
+        {/* Back Button */}
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-red-600 hover:text-red-700 mb-6 transition-colors"
@@ -66,7 +84,7 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
+            {/* Email Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -84,13 +102,15 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* Message */}
+            {/* Success/Error Message */}
             {message && (
-              <div className={`p-4 rounded-lg border ${
-                messageType === "success" 
-                  ? "bg-green-50 border-green-200 text-green-700" 
-                  : "bg-red-50 border-red-200 text-red-700"
-              }`}>
+              <div
+                className={`p-4 rounded-lg border ${
+                  messageType === "success"
+                    ? "bg-green-50 border-green-200 text-green-700"
+                    : "bg-red-50 border-red-200 text-red-700"
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   {messageType === "success" ? (
                     <CheckCircle className="h-5 w-5" />
@@ -107,7 +127,7 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -124,7 +144,7 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
             </button>
           </form>
 
-          {/* Additional info */}
+          {/* Info Box */}
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700">
               <strong>Note:</strong> For security reasons, we'll only send an email if this address is registered in our system.

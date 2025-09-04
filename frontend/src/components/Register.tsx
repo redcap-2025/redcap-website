@@ -39,12 +39,10 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
   // Handle browser back button
   React.useEffect(() => {
     window.history.pushState({ page: 'register' }, '', '');
-
     const handlePopState = (event: PopStateEvent) => {
       event.preventDefault();
       onBack();
     };
-
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -55,16 +53,9 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -86,7 +77,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^[6-9]\d{9}$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid 10-digit Indian phone number';
+      newErrors.phone = 'Enter a valid 10-digit Indian phone number';
     }
 
     if (!formData.password) {
@@ -94,8 +85,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password =
-        'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+      newErrors.password = 'Must include uppercase, lowercase, and number';
     }
 
     if (!formData.confirmPassword) {
@@ -148,11 +138,13 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         state: formData.state,
         pincode: formData.pincode,
       });
-      // Success handled by AuthContext
-    } catch (error: any) {
-      setErrors({
-        general: error.message || 'Registration failed. Please try again.',
-      });
+    } catch (err: any) {
+      // Use user-friendly message for network/JSON errors
+      const errorMsg = err.message.includes("token '<'")
+        ? "Unable to connect to server. Please check your internet connection."
+        : err.message || "Registration failed. Please try again.";
+
+      setErrors({ general: errorMsg });
     } finally {
       setIsLoading(false);
     }
@@ -173,21 +165,14 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         {/* Register Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-red-100">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Create Account
-            </h1>
-            <p className="text-gray-600">
-              Join RedCap for seamless logistics solutions
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+            <p className="text-gray-600">Join RedCap for seamless logistics solutions</p>
           </div>
 
-          {/* Register Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* FULL NAME */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Full Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Full Name</label>
               <div className="relative mt-1">
                 <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -201,16 +186,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   }`}
                 />
               </div>
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-              )}
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
             </div>
 
             {/* EMAIL */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email Address</label>
               <div className="relative mt-1">
                 <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -224,16 +205,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   }`}
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
 
             {/* PHONE */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Phone Number
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
               <div className="relative mt-1">
                 <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -247,16 +224,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   }`}
                 />
               </div>
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
             </div>
 
             {/* PASSWORD */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <div className="relative mt-1">
                 <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -274,23 +247,15 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
             </div>
 
             {/* CONFIRM PASSWORD */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Confirm Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
               <div className="relative mt-1">
                 <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -305,31 +270,21 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowConfirmPassword(!showConfirmPassword)
-                  }
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.confirmPassword}
-                </p>
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
               )}
             </div>
 
             {/* ADDRESS FIELDS */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Door No.
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Door No.</label>
                 <input
                   type="text"
                   name="doorNumber"
@@ -340,16 +295,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   }`}
                 />
                 {errors.doorNumber && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.doorNumber}
-                  </p>
+                  <p className="mt-1 text-sm text-red-600">{errors.doorNumber}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Building Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Building Name</label>
                 <input
                   type="text"
                   name="buildingName"
@@ -361,9 +312,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Street
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Street</label>
               <input
                 type="text"
                 name="street"
@@ -373,16 +322,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   errors.street ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
-              {errors.street && (
-                <p className="mt-1 text-sm text-red-600">{errors.street}</p>
-              )}
+              {errors.street && <p className="mt-1 text-sm text-red-600">{errors.street}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  City
-                </label>
+                <label className="block text-sm font-medium text-gray-700">City</label>
                 <input
                   type="text"
                   name="city"
@@ -392,15 +337,11 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                     errors.city ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
-                {errors.city && (
-                  <p className="mt-1 text-sm text-red-600">{errors.city}</p>
-                )}
+                {errors.city && <p className="mt-1 text-sm text-red-600">{errors.city}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  State
-                </label>
+                <label className="block text-sm font-medium text-gray-700">State</label>
                 <input
                   type="text"
                   name="state"
@@ -410,16 +351,12 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                     errors.state ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
-                {errors.state && (
-                  <p className="mt-1 text-sm text-red-600">{errors.state}</p>
-                )}
+                {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Pincode
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Pincode</label>
               <div className="relative mt-1">
                 <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
@@ -433,16 +370,14 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   }`}
                 />
               </div>
-              {errors.pincode && (
-                <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>
-              )}
+              {errors.pincode && <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>}
             </div>
 
-            {/* General errors */}
+            {/* General Error */}
             {errors.general && (
-              <p className="text-center text-red-600 font-medium">
-                {errors.general}
-              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-center text-sm">{errors.general}</p>
+              </div>
             )}
 
             {/* Submit Button */}

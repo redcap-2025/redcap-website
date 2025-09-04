@@ -153,50 +153,51 @@ const register = async (userData: Omit<User, "id" | "createdAt">) => {
     }
   };
 
-  /** 📧 FORGOT PASSWORD */
-  const forgotPassword = async (email: string) => {
-    setError(null);
-    try {
-      // ✅ Use apiService or consistent base URL
-      const url = `${import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"}/api/forgot-password`;
-      
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+/** 📧 FORGOT PASSWORD */
+const forgotPassword = async (email: string) => {
+  setError(null);
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"; // ✅ No spaces
+    const url = `${baseUrl}/api/forgot-password`;
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to send reset link");
-      }
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Failed to send reset link");
     }
-  };
+  } catch (err: any) {
+    setError(err.message);
+    throw err;
+  }
+};
 
-  /** 🔐 RESET PASSWORD */
-  const resetPassword = async (token: string, newPassword: string, email: string) => {
-    setError(null);
-    try {
-      const url = `${import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"}/api/reset-password`;
-      
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password: newPassword }),
-      });
+/** 🔐 RESET PASSWORD */
+const resetPassword = async (token: string, newPassword: string, email: string) => {
+  setError(null);
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"; // ✅ No spaces
+    const url = `${baseUrl}/api/reset-password`;
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to reset password");
-      }
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, email, password: newPassword }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Failed to reset password");
     }
-  };
+  } catch (err: any) {
+    setError(err.message);
+    throw err;
+  }
+};
 
   return (
     <AuthContext.Provider

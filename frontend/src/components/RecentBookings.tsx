@@ -1,3 +1,4 @@
+// RecentBookings.tsx
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Package, Truck, User, DollarSign } from "lucide-react";
 import axios from "axios";
@@ -20,7 +21,8 @@ interface DBBooking {
   receiverName?: string;
 }
 
-const API_BASE_URL = "http://localhost:8000/api";
+// ✅ Use environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const formatCityState = (city?: string | null, state?: string | null) => {
   const c = (city || "").trim();
@@ -76,20 +78,34 @@ interface Props {
   onBack: () => void;
 }
 
-const RecentBookings: React.FC<Props> = ({ onBack}) => {
+const RecentBookings: React.FC<Props> = ({ onBack }) => {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<DBBooking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchBookings = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem("redcap_token");
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-        const res = await axios.get(`${API_BASE_URL}/bookings`, { headers });
-        setBookings(res.data?.bookings ?? res.data ?? []);
-      } catch (err) {
-        console.error("Error fetching bookings:", err);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const res = await axios.get(`${API_BASE_URL}/api/bookings`, { headers });
+
+        // Handle response structure
+        const data = res.data?.bookings || res.data || [];
+        setBookings(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        console.error("Error fetching bookings:", err.message);
+
+        // Handle non-JSON responses (e.g., 500, 404)
+        if (err.response?.status === 401) {
+          // Token expired
+          console.log("Session expired");
+        } else if (err.message.includes("token '<'")) {
+          console.error("Server returned HTML. Check API_BASE_URL");
+        }
+
         setBookings([]);
       } finally {
         setLoading(false);
@@ -101,11 +117,10 @@ const RecentBookings: React.FC<Props> = ({ onBack}) => {
     } else {
       setLoading(false);
     }
-  }, [user]); // Can be [] if you want to only fetch on initial render
+  }, [user]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#fee9e9" }}>
-
       {/* Header Bar */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -128,9 +143,7 @@ const RecentBookings: React.FC<Props> = ({ onBack}) => {
       {/* Page Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            My Bookings
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">My Bookings</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Track your packages and manage deliveries with real-time updates
           </p>
@@ -154,10 +167,9 @@ const RecentBookings: React.FC<Props> = ({ onBack}) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {bookings.map((booking) => {
               const statusConfig = getStatusConfig(booking.status);
-
               return (
                 <div
-                  key={booking.trackingCode} // Use trackingCode as key
+                  key={booking.trackingCode}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-300 overflow-hidden group"
                 >
                   {/* Card Header */}

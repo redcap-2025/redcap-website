@@ -15,7 +15,7 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  // 🔙 Handle browser back button
+  // 🔙 Prevent browser back navigation
   useEffect(() => {
     window.history.pushState({ page: 'login' }, '', '');
     const handlePopState = (event: PopStateEvent) => {
@@ -64,8 +64,9 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
 
     try {
       await login(formData.email, formData.password);
-    } catch {
-      // error already comes from context
+    } catch (err: any) {
+      // Error already handled by context, but you can log for debugging
+      console.error("Login failed:", err.message);
     }
   };
 
@@ -153,7 +154,15 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
             </div>
 
             {/* Server Error */}
-            {error && <p className="text-red-600 text-center text-sm">{error}</p>}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm text-center">
+                  {error.includes("JSON") 
+                    ? "Unable to connect to server. Please check your internet or try again later." 
+                    : error}
+                </p>
+              </div>
+            )}
 
             {/* Submit */}
             <button
