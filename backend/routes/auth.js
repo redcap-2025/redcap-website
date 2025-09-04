@@ -37,10 +37,10 @@ router.post("/register", async (req, res) => {
     } = req.body;
 
     // Enhanced validation
-    if (!email || !password || !fullName || !phone) {
+    if (!email || !password || !fullName || !phone || !pincode) {
       return res.status(400).json({ 
         success: false, 
-        message: "Missing required fields: email, password, fullName, or phone" 
+        message: "Missing required fields: email, password, fullName, phone, or pincode" 
       });
     }
 
@@ -55,6 +55,14 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: "Password must be at least 8 characters long" 
+      });
+    }
+
+    // Validate pincode format (6 digits)
+    if (!/^\d{6}$/.test(pincode)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Pincode must be a 6-digit number" 
       });
     }
 
@@ -85,7 +93,7 @@ router.post("/register", async (req, res) => {
         street,
         city,
         state,
-        pincode,
+        pincode.toString(), // Ensure pincode is treated as string
       ]
     );
 
@@ -105,8 +113,17 @@ router.post("/register", async (req, res) => {
 
     res.json({ success: true, token, user });
   } catch (err) {
-    console.error("❌ Register error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Register error details:", {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -152,8 +169,17 @@ router.post("/login", async (req, res) => {
 
     res.json({ success: true, token, user });
   } catch (err) {
-    console.error("❌ Login error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Login error details:", {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -210,7 +236,10 @@ router.post("/forgot-password", async (req, res) => {
         message: "Password reset link has been sent to your email." 
       });
     } catch (emailErr) {
-      console.error("❌ Email sending failed:", emailErr.message);
+      console.error("❌ Email sending failed:", {
+        message: emailErr.message,
+        stack: emailErr.stack
+      });
       // Still return success to prevent email enumeration attacks
       return res.json({ 
         success: true, 
@@ -218,8 +247,17 @@ router.post("/forgot-password", async (req, res) => {
       });
     }
   } catch (err) {
-    console.error("❌ Forgot password error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Forgot password error details:", {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -277,8 +315,17 @@ router.post("/reset-password", async (req, res) => {
       message: "Password reset successful" 
     });
   } catch (err) {
-    console.error("❌ Reset password error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Reset password error details:", {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -312,8 +359,17 @@ router.post("/verify-reset-token", async (req, res) => {
       message: "Token is valid" 
     });
   } catch (err) {
-    console.error("❌ Verify reset token error:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Verify reset token error details:", {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 

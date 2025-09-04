@@ -53,7 +53,15 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Special handling for pincode - only allow digits
+    if (name === 'pincode') {
+      const numericValue = value.replace(/\D/g, '');
+      setFormData((prev) => ({ ...prev, [name]: numericValue }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
@@ -126,6 +134,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
 
     setIsLoading(true);
     try {
+      // ✅ FIXED: Ensure pincode is always a string (even if backend expects number)
       await register({
         fullName: formData.name,
         email: formData.email,
@@ -136,23 +145,35 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         street: formData.street,
         city: formData.city,
         state: formData.state,
-        pincode: formData.pincode,
+        pincode: formData.pincode,  // Already a string
       });
       
-      // ✅ FIXED: Use callback prop instead of navigate
       // Navigate to login after successful registration
       setTimeout(() => {
         onSwitchToLogin();
       }, 300);
     } catch (err: any) {
+      console.error("Registration error details:", err);
+      
       // Handle specific error messages
       if (err.message.includes("Email already registered")) {
         setErrors({ 
           email: "This email is already registered" 
         });
+      } else if (err.message.includes("Invalid email or password")) {
+        setErrors({ 
+          email: "Invalid email format",
+          password: "Password must meet requirements" 
+        });
+      } else if (err.message.includes("Missing required fields")) {
+        setErrors({ 
+          general: "Please fill in all required fields" 
+        });
       } else {
         const errorMsg = err.message.includes("token '<'")
           ? "Unable to connect to server. Please check your internet connection."
+          : err.message.includes("Server error")
+          ? "Registration failed. Please check your details and try again."
           : err.message || "Registration failed. Please try again.";
           
         setErrors({ general: errorMsg });
@@ -377,6 +398,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
                   value={formData.pincode}
                   onChange={handleChange}
                   placeholder="600001"
+                  maxLength={6}
                   className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 ${
                     errors.pincode ? 'border-red-500' : 'border-gray-300'
                   }`}
