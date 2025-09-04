@@ -5,27 +5,10 @@ const db = require("../config/db");
 const auth = require("../middleware/auth");
 
 // 🔹 GET /api/profile - Get user profile
-router.get("/profile", auth, async (req, res) => {
+// PUT /api/profile - Update user profile
+router.put("/", auth, async (req, res) => {
   try {
-    const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    // Remove sensitive fields
-    const { password, resetToken, resetTokenExpiration, ...user } = rows[0];
-    res.json({ success: true, user });
-  } catch (err) {
-    console.error("❌ Error fetching profile:", err.message);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-// 🔹 PUT /api/profile - Update user profile
-router.put("/profile", auth, async (req, res) => {
-  try {
-    const { fullName, phone, doorNumber, buildingName, street, city, state, pincode } = req.body;
+    const { phone, doorNumber, buildingName, street, city, state, pincode } = req.body;
 
     // 1. Get current user data
     const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
@@ -36,7 +19,6 @@ router.put("/profile", auth, async (req, res) => {
 
     // 2. Build updated fields (keep old if not provided)
     const updatedUser = {
-      fullName: fullName || current.fullName,
       phone: phone || current.phone,
       doorNumber: doorNumber || current.doorNumber,
       buildingName: buildingName || current.buildingName,
@@ -46,14 +28,13 @@ router.put("/profile", auth, async (req, res) => {
       pincode: pincode || current.pincode,
     };
 
-    // 3. Update in DB
+    // 3. Update only allowed fields (no fullName, no email)
     await db.execute(
       `UPDATE users 
-       SET fullName = ?, phone = ?, doorNumber = ?, buildingName = ?, 
+       SET phone = ?, doorNumber = ?, buildingName = ?, 
            street = ?, city = ?, state = ?, pincode = ? 
        WHERE id = ?`,
       [
-        updatedUser.fullName,
         updatedUser.phone,
         updatedUser.doorNumber,
         updatedUser.buildingName,
@@ -65,11 +46,7 @@ router.put("/profile", auth, async (req, res) => {
       ]
     );
 
-    // 4. Fetch latest user from DB (clean response)
-    const [updatedRows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
-    const { password, resetToken, resetTokenExpiration, ...cleanUser } = updatedRows[0];
-
-    res.json({ success: true, user: cleanUser });
+    res.json({ success: true, user: { ...current, ...updatedUser } });
   } catch (err) {
     console.error("❌ Error updating profile:", err.message);
     res.status(500).json({ success: false, message: "Server error" });
