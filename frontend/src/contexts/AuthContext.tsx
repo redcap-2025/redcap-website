@@ -1,7 +1,7 @@
 // AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthState } from "../types/user";
-import { apiService } from "../services/api"; // ← Use shared ApiService
+import { apiService } from "../services/api"; // ← Make sure this is correct path
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -11,7 +11,7 @@ interface AuthContextType extends AuthState {
   fetchProfile: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (token: string, newPassword: string, email: string) => Promise<void>; // Added email
+  resetPassword: (token: string, newPassword: string, email: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -57,8 +57,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem("redcap_user");
         localStorage.removeItem("redcap_token");
       }
+    } else {
+      setAuthState((prev) => ({ ...prev, loading: false }));
     }
-    setAuthState((prev) => ({ ...prev, loading: false }));
   }, []);
 
   const clearError = () => setError(null);
@@ -72,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!response.success || !response.user || !response.token) {
         throw new Error(response.error || "Login failed");
       }
-
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       setError(err.message);
@@ -82,26 +82,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /** 📝 REGISTER */
-  const register = async (userData: Omit<User, "id" | "createdAt">) => {
-    setAuthState((prev) => ({ ...prev, loading: true }));
-    setError(null);
-    try {
-      const response = await apiService.register(userData as any); // 👈 cast if needed for fields like doorNumber
-      if (!response.success || !response.user || !response.token) {
-        throw new Error(response.error || "Registration failed");
-      }
+const register = async (userData: Omit<User, "id" | "createdAt">) => {
+  setAuthState((prev) => ({ ...prev, loading: true }));
+  setError(null);
 
-      setAuthState({ isAuthenticated: true, user: response.user, loading: false });
-    } catch (err: any) {
-      setError(err.message);
-      setAuthState((prev) => ({ ...prev, loading: false }));
-      throw err;
+  // ✅ Frontend validation (optional but helpful)
+  if (!userData.email || !userData.password || !userData.fullName || !userData.phone) {
+    setError("All fields are required");
+    setAuthState((prev) => ({ ...prev, loading: false }));
+    return;
+  }
+
+  try {
+    const response = await apiService.register(userData);
+
+    if (!response.success || !response.user || !response.token) {
+      throw new Error(response.error || "Registration failed");
     }
-  };
+
+    setAuthState({ isAuthenticated: true, user: response.user, loading: false });
+  } catch (err: any) {
+    console.error("❌ Registration error:", err.message);
+    
+    // Handle network errors, CORS, 500s, etc.
+    const errorMessage = err.message || "Something went wrong. Please try again.";
+    
+    setError(errorMessage);
+    setAuthState((prev) => ({ ...prev, loading: false }));
+    
+    // Re-throw only if needed for higher-level handling
+    // throw err;
+  }
+};
 
   /** 🚪 LOGOUT */
   const logout = () => {
-    apiService.logout(); // ← ApiService handles localStorage cleanup
+    apiService.logout();
     setAuthState({ isAuthenticated: false, user: null, loading: false });
   };
 
@@ -111,8 +127,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
-      const updated = await apiService.updateProfile(userData as any); // 👈 use ApiService
-      const updatedUser = { ...authState.user, ...updated.user };
+      const updated = await apiService.updateProfile(userData);
+      const updatedUser = { ...authState.user, ...updated };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
     } catch (err: any) {
@@ -141,11 +157,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const forgotPassword = async (email: string) => {
     setError(null);
     try {
-      const res = await fetch("https://redcap-website.onrender.com/api/forgot-password", {
+      // ✅ Use apiService or consistent base URL
+      const url = `${import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"}/api/forgot-password`;
+      
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to send reset link");
@@ -160,11 +180,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (token: string, newPassword: string, email: string) => {
     setError(null);
     try {
-      const res = await fetch("https://redcap-website.onrender.com/api/reset-password", {
+      const url = `${import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"}/api/reset-password`;
+      
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, email, password: newPassword }),
       });
+
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to reset password");

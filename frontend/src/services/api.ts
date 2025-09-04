@@ -1,19 +1,18 @@
 // services/apiService.ts
 
-// 🔧 Use relative path or environment variable
+// 🔧 Use environment variable for flexibility
 const API_BASE_URL =
   import.meta.env?.PROD
-    ? "https://redcap-website.onrender.com"  // ✅ Updated to your Render URL
+    ? "https://redcap-website.onrender.com"  // ✅ No trailing spaces!
     : "http://localhost:8000";
 
-// Optional: Use environment variable if using build-time injection
+// ✅ Better: Use VITE_API_URL (recommended)
 // const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 class ApiService {
   private token: string | null = null;
 
   constructor() {
-    // Get token from localStorage on initialization
     this.token = localStorage.getItem("redcap_token");
   }
 
@@ -21,7 +20,8 @@ class ApiService {
    * Generic request handler with auth & JSON support
    */
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    // Ensure clean URL construction
+    const url = new URL(endpoint, API_BASE_URL).href;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -52,7 +52,7 @@ class ApiService {
     }
   }
 
-  // 🔹 REGISTER + Auto-login
+  // 🔹 REGISTER
   async register(userData: {
     fullName: string;
     email: string;
@@ -101,7 +101,7 @@ class ApiService {
     return response;
   }
 
-  // 🔹 PROFILE: Get & Update
+  // 🔹 PROFILE
   async getProfile() {
     return await this.request<any>("/api/profile");
   }
@@ -156,7 +156,6 @@ class ApiService {
     return !!this.token;
   }
 
-  // Optional: Refresh user from localStorage
   getStoredUser() {
     const userStr = localStorage.getItem("redcap_user");
     return userStr ? JSON.parse(userStr) : null;
