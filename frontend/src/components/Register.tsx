@@ -56,7 +56,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     
     // Special handling for pincode - only allow digits
     if (name === 'pincode') {
-      const numericValue = value.replace(/\D/g, '');
+      const numericValue = value.replace(/\D/g, '').slice(0, 6);
       setFormData((prev) => ({ ...prev, [name]: numericValue }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -102,8 +102,11 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    // ✅ FIXED: Allow alphanumeric and special characters for doorNumber
     if (!formData.doorNumber.trim()) {
       newErrors.doorNumber = 'Door number is required';
+    } else if (formData.doorNumber.length > 50) {
+      newErrors.doorNumber = 'Door number cannot exceed 50 characters';
     }
 
     if (!formData.street.trim()) {
@@ -134,7 +137,6 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
 
     setIsLoading(true);
     try {
-      // ✅ FIXED: Ensure pincode is always a string (even if backend expects number)
       await register({
         fullName: formData.name,
         email: formData.email,
@@ -145,29 +147,18 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         street: formData.street,
         city: formData.city,
         state: formData.state,
-        pincode: formData.pincode,  // Already a string
+        pincode: formData.pincode,
       });
       
-      // Navigate to login after successful registration
       setTimeout(() => {
         onSwitchToLogin();
       }, 300);
     } catch (err: any) {
       console.error("Registration error details:", err);
       
-      // Handle specific error messages
       if (err.message.includes("Email already registered")) {
         setErrors({ 
           email: "This email is already registered" 
-        });
-      } else if (err.message.includes("Invalid email or password")) {
-        setErrors({ 
-          email: "Invalid email format",
-          password: "Password must meet requirements" 
-        });
-      } else if (err.message.includes("Missing required fields")) {
-        setErrors({ 
-          general: "Please fill in all required fields" 
         });
       } else {
         const errorMsg = err.message.includes("token '<'")
