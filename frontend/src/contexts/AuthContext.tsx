@@ -7,13 +7,14 @@ interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: Omit<User, "id" | "createdAt">) => Promise<void>;
   logout: () => void;
-  updateProfile: (userData: Partial<User>) => Promise<void>;
+  updateProfile: (userData: Partial<User>) => Promise<User>;
   fetchProfile: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string, email: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
+  setUser: (user: User) => void; // ✅ Added setUser to context
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const errorMessage = err.message.includes("Invalid email or password")
         ? "Invalid email or password. Please try again."
         : err.message;
-        
+      
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
       throw err;
@@ -115,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const errorMessage = err.message.includes("Email already registered")
         ? "This email is already registered. Please try logging in."
         : err.message || "Something went wrong. Please try again.";
-        
+      
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
     }
@@ -129,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /** 👤 UPDATE PROFILE */
   const updateProfile = async (userData: Partial<User>) => {
-    if (!authState.user) return;
+    if (!authState.user) throw new Error("No user to update");
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     
@@ -143,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedUser = { ...authState.user, ...updated };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
+      return updatedUser; // ✅ Return updated user
     } catch (err: any) {
       setError(err.message);
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -187,6 +189,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ✅ Added setUser function
+  const setUser = (newUser: User) => {
+    setAuthState((prev) => ({ ...prev, user: newUser }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -201,6 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         error,
         clearError,
+        setUser, // ✅ Expose setUser
       }}
     >
       {children}

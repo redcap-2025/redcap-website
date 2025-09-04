@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, MapPin, Save, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, MapPin, Save, ArrowLeft } from 'lucide-react';
 
 interface UserProfileProps {
   onBack: () => void;
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, setUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -99,7 +99,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      await updateProfile(formData); // send updated formData
+      const updatedUser = await updateProfile(formData);
+      setUser(updatedUser);
+      setFormData({
+        fullName: updatedUser.fullName || '',
+        email: updatedUser.email || '',
+        phone: updatedUser.phone || '',
+        doorNumber: updatedUser.doorNumber || '',
+        buildingName: updatedUser.buildingName || '',
+        street: updatedUser.street || '',
+        city: updatedUser.city || '',
+        state: updatedUser.state || '',
+        pincode: updatedUser.pincode || ''
+      });
       setIsEditing(false);
       alert('Profile updated successfully!');
     } catch (error) {
@@ -146,7 +158,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                  <User className="h-8 w-8 text-red-500" />
+                  <UserIcon className="h-8 w-8 text-red-500" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-white">{user?.fullName}</h1>
@@ -193,7 +205,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
               {/* Personal Information */}
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <User className="h-5 w-5 text-red-500" />
+                  <UserIcon className="h-5 w-5 text-red-500" />
                   Personal Information
                 </h2>
 
@@ -206,7 +218,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
                       name="fullName"
                       value={formData.fullName}
                       readOnly
-                       className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                     />
                   ) : (
                     <p className="text-gray-900 bg-gray-50 px-4 py-3 rounded-lg">{user?.fullName}</p>
