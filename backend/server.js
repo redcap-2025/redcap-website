@@ -1,42 +1,31 @@
 // server.js
-// server.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// ✅ Move this BEFORE requiring db
 dotenv.config();
 
-// ✅ Now safe to require db
 const pool = require('./config/db');
-
 const app = express();
 
-// ✅ CORS: Fix trailing space and validate REACT_APP_FRONTEND_URL
-const allowedOrigins = [
+// ✅ Use environment variable for frontend origin
+const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:5173';
+const LOCALHOSTS = [
   'http://localhost:5173',
-  'http://localhost:5000',
-  'http://127.0.0.1:5000',
   'http://localhost:3000',
-  'https://recapweb.netlify.app', // ✅ No spaces
+  'http://127.0.0.1:5000'
 ];
 
-// Use REACT_APP_FRONTEND_URL if set and valid
-if (process.env.REACT_APP_FRONTEND_URL && !allowedOrigins.includes(process.env.REACT_APP_FRONTEND_URL)) {
-  allowedOrigins.push(process.env.REACT_APP_FRONTEND_URL);
-}
+const allowedOrigins = [FRONTEND_URL, ...LOCALHOSTS];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl)
-    if (!origin) return callback(null, true);
-
+    if (!origin) return callback(null, true); // Allow mobile/curl
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`❌ Blocked CORS request from: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+    console.warn(`❌ Blocked CORS request from: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
 }));
