@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Truck, Package, MapPin, Clock, Mail, Phone } from 'lucide-react';
-import axios from 'axios';
+import { apiService } from '../services/api';
+
 interface UserDashboardProps {
   onStartBooking: () => void;
   onTrackPackage: () => void;
@@ -38,11 +39,7 @@ interface DBBooking {
   vehicleType?: string;
   pickupAt?: string | null;
   createdAt?: string | null;
-
-  
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const formatCityState = (city?: string | null, state?: string | null) => {
   const c = (city || '').trim();
@@ -53,14 +50,22 @@ const formatCityState = (city?: string | null, state?: string | null) => {
 
 const formatDate = (iso?: string | null) => {
   if (!iso) return '—';
-  // expect "YYYY-MM-DD..." from DB
-  return iso.slice(0, 10);
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
 };
 
-const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPackage, onViewAllBookings  }) => {
+const UserDashboard: React.FC<UserDashboardProps> = ({ 
+  onStartBooking, 
+  onTrackPackage, 
+  onViewAllBookings  
+}) => {
   const { user } = useAuth();
-
   const [bookings, setBookings] = useState<DBBooking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // fetch bookings (and refresh every 10s)
   useEffect(() => {
@@ -68,15 +73,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
 
     const fetchBookings = async () => {
       try {
-        const token = localStorage.getItem('redcap_token');
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-        const res = await axios.get(`${API_BASE_URL}/bookings`, { headers });
+        setLoading(true);
+        setError(null);
+        
+        // ✅ Use apiService instead of direct axios call
+        const data = await apiService.getUserBookings();
+        
         if (!cancelled) {
-          const rows: DBBooking[] = res.data?.bookings ?? res.data ?? [];
-          setBookings(Array.isArray(rows) ? rows : []);
+          setBookings(Array.isArray(data.bookings) ? data.bookings : []);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching bookings:', err);
+        setError(err.message || "Failed to load bookings. Please try again.");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
@@ -87,6 +99,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
         cancelled = true;
         clearInterval(t);
       };
+    } else {
+      setLoading(false);
     }
   }, [user?.id]);
 
@@ -123,7 +137,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
         to: formatCityState(b.dropoffCity, b.dropoffState),
         date: formatDate(b.pickupAt || b.createdAt || undefined),
         status: b.status || 'Pending',
-       
       }));
   }, [bookings]);
 
@@ -143,6 +156,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
         return 'text-gray-600 bg-gray-100';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-red-100 rounded-full"></div>
+            <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+          </div>
+          <p className="text-gray-600 font-medium mt-4">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 pt-20">
@@ -168,38 +195,42 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+            <p className="text-red-600 text-sm text-center">{error}</p>
+          </div>
+        )}
+
         {/* Stats Grid */}
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-  {stats.map((stat, index) => (
-    <div
-      key={index}
-      className="bg-white rounded-xl shadow-lg p-6 border border-red-100 hover:shadow-xl transition-shadow duration-300"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+          {stats.map((stat, index) => (
+            <div
+              key={index}
+              className="bg-white rounded-xl shadow-lg p-6 border border-red-100 hover:shadow-xl transition-shadow duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">{stat.label}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                </div>
+                <div className={`${stat.color} bg-red-50 p-3 rounded-lg`}>{stat.icon}</div>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className={`${stat.color} bg-red-50 p-3 rounded-lg`}>{stat.icon}</div>
-      </div>
-    </div>
-  ))}
-</div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Recent Bookings */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-red-100">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Recent Bookings</h2>
-              
-
-<button
-  onClick={onViewAllBookings}   // 👈 use the prop here
-  className="text-red-500 hover:text-red-600 font-medium"
->
-  View All
-</button>
-
+              <button
+                onClick={onViewAllBookings}
+                className="text-red-500 hover:text-red-600 font-medium"
+              >
+                View All
+              </button>
             </div>
             <div className="space-y-4">
               {recentBookings.map((booking) => (
@@ -382,7 +413,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onStartBooking, onTrackPa
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -18,6 +19,7 @@ interface RegisterProps {
 
 const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
   const { register } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -138,13 +140,24 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         state: formData.state,
         pincode: formData.pincode,
       });
+      
+      // Navigate to login after successful registration
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 300);
     } catch (err: any) {
-      // Use user-friendly message for network/JSON errors
-      const errorMsg = err.message.includes("token '<'")
-        ? "Unable to connect to server. Please check your internet connection."
-        : err.message || "Registration failed. Please try again.";
-
-      setErrors({ general: errorMsg });
+      // Handle specific error messages
+      if (err.message.includes("Email already registered")) {
+        setErrors({ 
+          email: "This email is already registered" 
+        });
+      } else {
+        const errorMsg = err.message.includes("token '<'")
+          ? "Unable to connect to server. Please check your internet connection."
+          : err.message || "Registration failed. Please try again.";
+          
+        setErrors({ general: errorMsg });
+      }
     } finally {
       setIsLoading(false);
     }

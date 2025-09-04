@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
   onBack: () => void;
@@ -10,7 +11,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassword }) => {
   const { login, isAuthenticated, loading, error, clearError } = useAuth();
-
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -29,9 +30,12 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
   // ✅ Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated) {
-      onBack();
+      // Navigate to dashboard after successful login
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
     }
-  }, [isAuthenticated, onBack]);
+  }, [isAuthenticated, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -64,9 +68,21 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
 
     try {
       await login(formData.email, formData.password);
+      // If login succeeds but useEffect doesn't trigger (rare case)
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 200);
     } catch (err: any) {
-      // Error already handled by context, but you can log for debugging
-      console.error("Login failed:", err.message);
+      // Handle specific error messages
+      if (err.message.toLowerCase().includes('invalid email or password')) {
+        setErrors({ 
+          email: 'Invalid credentials', 
+          password: 'Invalid credentials' 
+        });
+      } else {
+        // Generic error message
+        console.error("Login failed:", err.message);
+      }
     }
   };
 
@@ -159,6 +175,8 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
                 <p className="text-red-600 text-sm text-center">
                   {error.includes("JSON") 
                     ? "Unable to connect to server. Please check your internet or try again later." 
+                    : error.includes("Invalid email or password") 
+                    ? "Invalid email or password. Please try again."
                     : error}
                 </p>
               </div>
