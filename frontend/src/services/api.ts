@@ -1,13 +1,7 @@
 // services/apiService.ts
 
-// 🔧 Use environment variable for flexibility
-const API_BASE_URL =
-  import.meta.env?.PROD
-    ? "https://redcap-website.onrender.com"  // ✅ No trailing spaces!
-    : "http://localhost:8000";
-
-// ✅ Better: Use VITE_API_URL (recommended)
-// const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// ✅ Use environment variable (recommended)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 class ApiService {
   private token: string | null = null;
@@ -20,7 +14,6 @@ class ApiService {
    * Generic request handler with auth & JSON support
    */
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // Ensure clean URL construction
     const url = new URL(endpoint, API_BASE_URL).href;
 
     const headers: Record<string, string> = {
@@ -37,6 +30,14 @@ class ApiService {
         ...options,
         headers,
       });
+
+      // ✅ Guard against HTML responses
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("❌ Non-JSON response:", text);
+        throw new Error("Server returned non-JSON response. Check your API URL.");
+      }
 
       const data: T & { success?: boolean; error?: string } = await response.json();
 
