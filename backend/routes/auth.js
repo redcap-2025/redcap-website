@@ -11,7 +11,10 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error("❌ JWT_SECRET is not set in environment variables");
-  process.exit(1);
+  // Don't exit the entire process, just log the error
+  console.error("Authentication routes will not be available");
+} else {
+  console.log("✅ JWT_SECRET is properly configured");
 }
 
 // ✅ Add route prefix validation
@@ -191,7 +194,7 @@ router.post("/forgot-password", async (req, res) => {
       [resetTokenHash, resetTokenExpiration, user.id]
     );
 
-    // ✅ Fixed: Remove trailing spaces and use correct environment variable
+    // ✅ FIXED: Remove trailing spaces in URL
     const FRONTEND_URL = process.env.FRONTEND_URL?.trim() || "https://recapweb.netlify.app";
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 

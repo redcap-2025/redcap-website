@@ -71,11 +71,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiService.login(email, password);
       if (!response.success || !response.user || !response.token) {
-        throw new Error(response.error || "Login failed");
+        // ✅ FIXED: Check both error and message fields
+        throw new Error(response.error || response.message || "Login failed");
       }
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
-      setError(err.message);
+      // ✅ FIXED: Show specific error message
+      const errorMessage = err.message.includes("Invalid email or password")
+        ? "Invalid email or password. Please try again."
+        : err.message;
+        
+      setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
       throw err;
     }
@@ -100,12 +106,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (!response.success || !response.user || !response.token) {
-        throw new Error(response.error || "Registration failed");
+        // ✅ FIXED: Check both error and message fields
+        throw new Error(response.error || response.message || "Registration failed");
       }
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       console.error("❌ Registration error:", err.message);
-      const errorMessage = err.message || "Something went wrong. Please try again.";
+      const errorMessage = err.message.includes("Email already registered")
+        ? "This email is already registered. Please try logging in."
+        : err.message || "Something went wrong. Please try again.";
+        
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
     }

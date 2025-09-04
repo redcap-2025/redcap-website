@@ -160,6 +160,8 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
                 <p className="text-red-600 text-sm text-center">
                   {error.includes("JSON") 
                     ? "Unable to connect to server. Please check your internet or try again later." 
+                    : error.includes("Invalid email or password")
+                    ? "Invalid email or password. Please try again."
                     : error}
                 </p>
               </div>

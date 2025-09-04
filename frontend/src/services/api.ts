@@ -1,4 +1,4 @@
-// services/apiService.ts
+// services/api.ts
 
 // ✅ Use environment variable (recommended)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -41,12 +41,16 @@ class ApiService {
         );
       }
 
-      // ✅ Fixed syntax error: Added 'data' variable name
-      const data: T & { success?: boolean; error?: string } = await response.json();
+      // ✅ FIXED: Correct type assertion syntax
+      const data = await response.json() as T & { 
+        success?: boolean; 
+        error?: string; 
+        message?: string 
+      };
 
       // ✅ Handle API-level errors (400, 401, 500 with JSON body)
       if (!response.ok) {
-        const errorMsg = data?.error || 
+        const errorMsg = data?.error || data?.message || 
           (response.status === 404 ? "Endpoint not found. Check API route structure." : response.statusText) || 
           "Request failed";
         throw new Error(errorMsg);
@@ -88,6 +92,7 @@ class ApiService {
       user: any;
       token: string;
       error?: string;
+      message?: string; // ✅ Added message field
     }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(userData),
@@ -100,13 +105,14 @@ class ApiService {
     return response;
   }
 
-  // 🔹 LOGIN - Fixed route structure
+  // 🔹 LOGIN - Fixed error message handling
   async login(email: string, password: string) {
     const response = await this.request<{
       success: boolean;
       user: any;
       token: string;
       error?: string;
+      message?: string; // ✅ Added message field
     }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
