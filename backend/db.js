@@ -4,31 +4,25 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',  // InfinityFree: e.g., sql102.infinityfree.com
-  port: parseInt(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'redcap_db',
+  host: process.env.MYSQLHOST || process.env.DB_HOST || '127.0.0.1',
+  port: parseInt(process.env.MYSQLPORT || process.env.DB_PORT) || 3306,
+  user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
+  password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
+  database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'railway',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  // For InfinityFree remote: Add SSL if required (usually not, but test)
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
+// Test connection
+pool.getConnection()
+  .then(connection => {
+    console.log('✅ Connected to MySQL database');
+    connection.release();
+  })
+  .catch(err => {
+    console.error('❌ MySQL connection failed:', err.message);
+  });
+
 module.exports = pool;
-
-
-// const pool = mysql.createPool({
-//   host: process.env.DB_HOST,
-//   port: parseInt(process.env.DB_PORT) || 3306,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_NAME,
-//   waitForConnections: true,
-//   connectionLimit: 10,
-//   queueLimit: 0,
-//   ssl: {
-//     rejectUnauthorized: true,
-//   },
-// });

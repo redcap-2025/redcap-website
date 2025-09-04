@@ -3,7 +3,7 @@
 // 🔧 Use relative path or environment variable
 const API_BASE_URL =
   import.meta.env?.PROD
-    ? "https://your-railway-app.up.railway.app"  // ✅ Replace with your Railway URL
+    ? "https://redcap-website.onrender.com"  // ✅ Updated to your Render URL
     : "http://localhost:8000";
 
 // Optional: Use environment variable if using build-time injection

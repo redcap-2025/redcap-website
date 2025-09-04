@@ -1,6 +1,7 @@
-// Update your imports for best practice
+// AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthState } from "../types/user";
+import { apiService } from "../services/api"; // ← Use shared ApiService
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -8,16 +9,14 @@ interface AuthContextType extends AuthState {
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   fetchProfile: () => Promise<void>;
-  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>; 
+  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string, email: string) => Promise<void>; // Added email
   error: string | null;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_BASE_URL = "http://localhost:8000/api"; // backend API
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
@@ -27,47 +26,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [error, setError] = useState<string | null>(null);
 
-  /** 🔐 Helpers */
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("redcap_token");
-    if (!token) throw new Error("No token found. Please log in again.");
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  };
-
+  /** 🔐 Reuse ApiService for authenticated requests */
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     const res = await fetch(url, {
       ...options,
       headers: {
+        "Content-Type": "application/json",
         ...(options.headers || {}),
-        ...getAuthHeaders(),
+        Authorization: `Bearer ${localStorage.getItem("redcap_token")}`,
       },
     });
 
     if (res.status === 401) {
-      logout();  // Log the user out if session expired
+      logout();
       throw new Error("Session expired. Please log in again.");
     }
 
     return res;
   };
 
-  /** 🔄 Init state from localStorage */
+  /** 🔄 Restore session from localStorage */
   useEffect(() => {
     const storedUser = localStorage.getItem("redcap_user");
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser) as User;
         setAuthState({ isAuthenticated: true, user, loading: false });
-      } catch {
+      } catch (err) {
+        console.error("Failed to parse stored user", err);
         localStorage.removeItem("redcap_user");
-        setAuthState((prev) => ({ ...prev, loading: false }));
+        localStorage.removeItem("redcap_token");
       }
-    } else {
-      setAuthState((prev) => ({ ...prev, loading: false }));
     }
+    setAuthState((prev) => ({ ...prev, loading: false }));
   }, []);
 
   const clearError = () => setError(null);
@@ -77,18 +68,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Invalid credentials");
+      const response = await apiService.login(email, password);
+      if (!response.success || !response.user || !response.token) {
+        throw new Error(response.error || "Login failed");
+      }
 
-      localStorage.setItem("redcap_token", data.token);
-      localStorage.setItem("redcap_user", JSON.stringify(data.user));
-
-      setAuthState({ isAuthenticated: true, user: data.user as User, loading: false });
+      setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       setError(err.message);
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -97,22 +82,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /** 📝 REGISTER */
-  const register = async (userData: Omit<User, "id" | "createdAt">): Promise<void> => {
+  const register = async (userData: Omit<User, "id" | "createdAt">) => {
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(userData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Registration failed");
+      const response = await apiService.register(userData as any); // 👈 cast if needed for fields like doorNumber
+      if (!response.success || !response.user || !response.token) {
+        throw new Error(response.error || "Registration failed");
+      }
 
-      localStorage.setItem("redcap_token", data.token);
-      localStorage.setItem("redcap_user", JSON.stringify(data.user));
-
-      setAuthState({ isAuthenticated: true, user: data.user as User, loading: false });
+      setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       setError(err.message);
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -122,25 +101,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /** 🚪 LOGOUT */
   const logout = () => {
-    localStorage.removeItem("redcap_user");
-    localStorage.removeItem("redcap_token");
+    apiService.logout(); // ← ApiService handles localStorage cleanup
     setAuthState({ isAuthenticated: false, user: null, loading: false });
   };
 
   /** 👤 UPDATE PROFILE */
-  const updateProfile = async (userData: Partial<User>): Promise<void> => {
+  const updateProfile = async (userData: Partial<User>) => {
     if (!authState.user) return;
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/profile`, {
-        method: "PUT",
-        body: JSON.stringify(userData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Update failed");
-
-      const updatedUser: User = { ...authState.user, ...data.user };
+      const updated = await apiService.updateProfile(userData as any); // 👈 use ApiService
+      const updatedUser = { ...authState.user, ...updated.user };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
     } catch (err: any) {
@@ -151,54 +123,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /** 🔄 FETCH PROFILE */
-  const fetchProfile = async (): Promise<void> => {
+  const fetchProfile = async () => {
+    setAuthState((prev) => ({ ...prev, loading: true }));
+    setError(null);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/profile`, { method: "GET" });
-      const data = await res.json();
-      if (!res.ok) throw new Error("Failed to fetch profile");
-
-      const mergedUser: User = { ...authState.user!, ...data };
+      const data = await apiService.getProfile();
+      const mergedUser = { ...authState.user, ...data } as User;
       localStorage.setItem("redcap_user", JSON.stringify(mergedUser));
       setAuthState({ isAuthenticated: true, user: mergedUser, loading: false });
     } catch (err: any) {
       setError(err.message);
+      setAuthState((prev) => ({ ...prev, loading: false }));
     }
   };
 
   /** 📧 FORGOT PASSWORD */
-  const forgotPassword = async (email: string): Promise<void> => {
+  const forgotPassword = async (email: string) => {
     setError(null);
-    const res = await fetch(`${API_BASE_URL}/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      setError(data.message || "Failed to send reset email");
-      throw new Error(data.message || "Failed to send reset email");
+    try {
+      const res = await fetch("https://redcap-website.onrender.com/api/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to send reset link");
+      }
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
     }
   };
 
- // In the resetPassword function, update to match the new API:
-const resetPassword = async (token: string, newPassword: string): Promise<void> => {
-  setError(null);
-  
-  // Get email from URL or state if needed
-  const email = ""; // You'll need to pass this from the reset page
-  
-  const res = await fetch(`${API_BASE_URL}/reset-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, email, password: newPassword }),
-  });
-  
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    setError(data.message || "Failed to reset password");
-    throw new Error(data.message || "Failed to reset password");
-  }
-};
+  /** 🔐 RESET PASSWORD */
+  const resetPassword = async (token: string, newPassword: string, email: string) => {
+    setError(null);
+    try {
+      const res = await fetch("https://redcap-website.onrender.com/api/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, email, password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to reset password");
+      }
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  };
 
   return (
     <AuthContext.Provider
@@ -221,8 +196,11 @@ const resetPassword = async (token: string, newPassword: string): Promise<void> 
   );
 };
 
-export const useAuth = () => {
+/** 🔍 Custom hook for using auth anywhere */
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
   return context;
 };
