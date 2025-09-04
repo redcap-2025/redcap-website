@@ -1,12 +1,11 @@
+// middleware/auth.js
 const jwt = require('jsonwebtoken');
 
 // 🔐 Validate JWT_SECRET is set at startup
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET is not set in environment variables');
-  console.error('Authentication middleware will not function properly');
-} else {
-  console.log('✅ JWT_SECRET is properly configured for auth middleware');
+  process.exit(1);
 }
 
 function auth(req, res, next) {

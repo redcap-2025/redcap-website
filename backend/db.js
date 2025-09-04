@@ -1,6 +1,6 @@
-// config/db.js (updated with your Railway details)
+// routes/db.js
 const mysql = require('mysql2/promise');
-require('dotenv').config(); // Loads .env for local dev
+require('dotenv').config(); // Only affects local dev
 
 // 🔧 Determine if in production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -35,11 +35,11 @@ pool.getConnection()
   .catch((err) => {
     console.error('❌ Database connection failed:', err.message);
     if (isProduction) {
-      console.error('💡 Check: MYSQLHOST, MYSQLPORT, SSL, and env vars in Railway Dashboard');
+      console.error('💡 Check: MYSQLHOST, MYSQLPORT, SSL, and env vars in Render Dashboard');
     } else {
-      console.error('🔧 Check: Is MySQL running? Does database "railway" (or local "redcap_db") exist?');
+      console.error('🔧 Check: Is MySQL running? Does database "redcap_db" exist?');
     }
-    process.exit(1); // Exit to force restart in deployment
+    process.exit(1);
   });
 
 // 🛡️ Handle connection errors (e.g., idle timeout)
@@ -47,7 +47,7 @@ pool.on('error', (err) => {
   console.error('⚠️ MySQL Pool Error:', err.message);
   if (err.code === 'PROTOCOL_CONNECTION_LOST' && isProduction) {
     console.log('🔄 Reconnecting...');
-    process.exit(1); // Let deployment platform restart the service
+    process.exit(1); // Let Render restart the service
   }
 });
 

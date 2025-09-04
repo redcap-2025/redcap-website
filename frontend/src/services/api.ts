@@ -4,6 +4,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 class ApiService {
+  private token: string | null = null;
+
+  constructor() {
+    this.token = localStorage.getItem("redcap_token");
+  }
 
   /**
    * Generic request handler with auth & JSON support
@@ -16,10 +21,8 @@ class ApiService {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    // Always get the latest token from localStorage to avoid staleness
-    const token = localStorage.getItem("redcap_token");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
 
     try {
@@ -221,17 +224,19 @@ class ApiService {
 
   // 🔹 AUTH HELPERS
   private setAuth(token: string, user: any) {
+    this.token = token;
     localStorage.setItem("redcap_token", token);
     localStorage.setItem("redcap_user", JSON.stringify(user));
   }
 
   logout() {
+    this.token = null;
     localStorage.removeItem("redcap_token");
     localStorage.removeItem("redcap_user");
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem("redcap_token");
+    return !!this.token;
   }
 
   getStoredUser() {

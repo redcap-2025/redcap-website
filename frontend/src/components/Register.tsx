@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   User,
@@ -17,7 +17,7 @@ interface RegisterProps {
 }
 
 const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
-  const { register, isAuthenticated, loading, error, clearError } = useAuth();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -34,9 +34,10 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   // Handle browser back button
-  useEffect(() => {
+  React.useEffect(() => {
     window.history.pushState({ page: 'register' }, '', '');
     const handlePopState = (event: PopStateEvent) => {
       event.preventDefault();
@@ -47,18 +48,6 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [onBack]);
-
-  // ✅ Redirect if already logged in
-  useEffect(() => {
-    if (isAuthenticated) {
-      onBack();
-    }
-  }, [isAuthenticated, onBack]);
-
-  // Clear server error on component mount
-  useEffect(() => {
-    clearError();
-  }, [clearError]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -76,7 +65,6 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
-    if (error) clearError();
   };
 
   const validateForm = () => {
@@ -147,6 +135,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    setIsLoading(true);
     try {
       await register({
         fullName: formData.name,
@@ -161,7 +150,9 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         pincode: formData.pincode,
       });
       
-      // Since register sets isAuthenticated, the useEffect will handle redirect
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 300);
     } catch (err: any) {
       console.error("Registration error details:", err);
       
@@ -178,6 +169,8 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
           
         setErrors({ general: errorMsg });
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -405,20 +398,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
               {errors.pincode && <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>}
             </div>
 
-            {/* Server Error */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-600 text-sm text-center">
-                  {error.includes("JSON") 
-                    ? "Unable to connect to server. Please check your internet or try again later." 
-                    : error.includes("Email already registered")
-                    ? "This email is already registered. Please try logging in."
-                    : error}
-                </p>
-              </div>
-            )}
-
-            {/* General Local Error */}
+            {/* General Error */}
             {errors.general && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <p className="text-red-600 text-center text-sm">{errors.general}</p>
@@ -428,10 +408,10 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Creating Account...
