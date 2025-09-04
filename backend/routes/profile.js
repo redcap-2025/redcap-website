@@ -7,14 +7,13 @@ const auth = require("../middleware/auth");
 // 🔹 GET /api/profile - Get user profile
 router.get("/profile", auth, async (req, res) => {
   try {
-    // Use execute() for better security and connection stability
     const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
 
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // Remove sensitive fields before sending
+    // Remove sensitive fields
     const { password, resetToken, resetTokenExpiration, ...user } = rows[0];
     res.json({ success: true, user });
   } catch (err) {
@@ -26,7 +25,7 @@ router.get("/profile", auth, async (req, res) => {
 // 🔹 PUT /api/profile - Update user profile
 router.put("/profile", auth, async (req, res) => {
   try {
-    const { name, phone, doorNumber, buildingName, street, city, state, pincode } = req.body;
+    const { fullName, phone, doorNumber, buildingName, street, city, state, pincode } = req.body;
 
     // 1. Get current user data
     const [rows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
@@ -37,7 +36,7 @@ router.put("/profile", auth, async (req, res) => {
 
     // 2. Build updated fields (keep old if not provided)
     const updatedUser = {
-      fullName: name || current.fullName,
+      fullName: fullName || current.fullName,
       phone: phone || current.phone,
       doorNumber: doorNumber || current.doorNumber,
       buildingName: buildingName || current.buildingName,
@@ -66,7 +65,11 @@ router.put("/profile", auth, async (req, res) => {
       ]
     );
 
-    res.json({ success: true, user: updatedUser });
+    // 4. Fetch latest user from DB (clean response)
+    const [updatedRows] = await db.execute("SELECT * FROM users WHERE id = ?", [req.user.id]);
+    const { password, resetToken, resetTokenExpiration, ...cleanUser } = updatedRows[0];
+
+    res.json({ success: true, user: cleanUser });
   } catch (err) {
     console.error("❌ Error updating profile:", err.message);
     res.status(500).json({ success: false, message: "Server error" });
