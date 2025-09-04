@@ -1,4 +1,4 @@
-// src/types/user.ts
+// types/user.ts
 
 export interface User {
   id: string;
@@ -15,7 +15,7 @@ export interface User {
   createdAt: string;
 }
 
-// ✅ Add and export RegisterUserData
+// ✅ Add this
 export interface RegisterUserData {
   fullName: string;
   email: string;
@@ -29,7 +29,6 @@ export interface RegisterUserData {
   pincode: string;
 }
 
-// Optional: For profile updates
 export interface UpdateUserData {
   fullName?: string;
   phone?: string;

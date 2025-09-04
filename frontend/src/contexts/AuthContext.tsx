@@ -1,13 +1,13 @@
 // contexts/AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, RegisterUserData, AuthState } from "../types/user";
+import { User, RegisterUserData, UpdateUserData, AuthState } from "../types/user";
 import { apiService } from "../services/api";
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterUserData) => Promise<void>;
   logout: () => void;
-  updateProfile: (userData: Partial<User>) => Promise<User>;
+  updateProfile: (userData: UpdateUserData) => Promise<User>;
   fetchProfile: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   forgotPassword: (email: string) => Promise<void>;
@@ -26,10 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Single logout definition
   const logout = () => {
-    localStorage.removeItem("redcap_token");
-    localStorage.removeItem("redcap_user");
     apiService.logout();
     setAuthState({ isAuthenticated: false, user: null, loading: false });
   };
@@ -53,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res;
   };
 
+  // Restore session from localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("redcap_user");
     if (storedUser) {
@@ -79,8 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!response.success || !response.user || !response.token) {
         throw new Error(response.error || response.message || "Login failed");
       }
-      localStorage.setItem("redcap_token", response.token);
-      localStorage.setItem("redcap_user", JSON.stringify(response.user));
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       const errorMessage = err.message.includes("Invalid email or password")
@@ -92,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ✅ Fixed: Use RegisterUserData here too
   const register = async (userData: RegisterUserData) => {
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
@@ -107,11 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!response.success || !response.user || !response.token) {
         throw new Error(response.error || response.message || "Registration failed");
       }
-      localStorage.setItem("redcap_token", response.token);
-      localStorage.setItem("redcap_user", JSON.stringify(response.user));
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
-      console.error("❌ Registration error:", err.message);
       const errorMessage = err.message.includes("Email already registered")
         ? "This email is already registered. Please try logging in."
         : err.message || "Something went wrong. Please try again.";
@@ -120,20 +114,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (userData: Partial<User>): Promise<User> => {
+  const updateProfile = async (userData: UpdateUserData): Promise<User> => {
     if (!authState.user) throw new Error("Not authenticated");
+
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
 
     try {
-      const filteredUserData = Object.fromEntries(
-        Object.entries(userData).filter(([_, value]) => value !== undefined)
-      ) as Partial<User>;
+      const result = await apiService.updateProfile(userData);
+      const updatedUser = { ...authState.user, ...result.user };
 
-      const updated = await apiService.updateProfile(filteredUserData);
-      const updatedUser = { ...authState.user, ...updated };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
+
       return updatedUser;
     } catch (err: any) {
       setError(err.message);

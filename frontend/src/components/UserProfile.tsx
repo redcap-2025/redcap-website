@@ -95,13 +95,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+// components/UserProfile.tsx
 const handleSave = async () => {
   if (!validateForm()) return;
   setIsLoading(true);
   try {
-    const updatedUser = await updateProfile(formData);
+    const updatedUser = await updateProfile(formData); // ✅ Gets updated user
 
-    // Sync form with updated user
+    // ✅ Sync form with updated user
     setFormData({
       fullName: updatedUser.fullName || '',
       email: updatedUser.email || '',
