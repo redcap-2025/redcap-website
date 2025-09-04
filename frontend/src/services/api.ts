@@ -31,29 +31,43 @@ class ApiService {
         headers,
       });
 
-      // ✅ Guard against HTML responses
+      // ✅ Guard against HTML responses (e.g., 404, 500, bad URL)
       const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         const text = await response.text();
-        console.error("❌ Non-JSON response:", text);
-        throw new Error("Server returned non-JSON response. Check your API URL.");
+        console.error("❌ Non-JSON response received:", text);
+        throw new Error(
+          "Server returned an invalid response. Check your internet connection and API URL."
+        );
       }
 
-      const data: T & { success?: boolean; error?: string } = await response.json();
+      const  T & { success?: boolean; error?: string } = await response.json();
 
+      // ✅ Handle API-level errors (400, 401, 500 with JSON body)
       if (!response.ok) {
-        const errorMsg = data.error || response.statusText || "Request failed";
+        const errorMsg = data?.error || response.statusText || "Request failed";
         throw new Error(errorMsg);
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      // ✅ Improve user-friendly error messages
+      if (error.message.includes("Failed to fetch")) {
+        throw new Error(
+          "Unable to connect to server. Please check your internet or try again later."
+        );
+      }
+      if (error.message.includes("Unexpected token '<'")) {
+        throw new Error(
+          "Invalid API URL or server error. Check VITE_API_URL in .env."
+        );
+      }
       console.error("API Request failed:", error);
       throw error;
     }
   }
 
-  // 🔹 REGISTER
+  // 🔹 REGISTER - Fixed route to include /auth
   async register(userData: {
     fullName: string;
     email: string;
@@ -71,7 +85,7 @@ class ApiService {
       user: any;
       token: string;
       error?: string;
-    }>("/api/register", {
+    }>("/api/auth/register", {  // ✅ Fixed: Added /auth segment
       method: "POST",
       body: JSON.stringify(userData),
     });
@@ -83,14 +97,14 @@ class ApiService {
     return response;
   }
 
-  // 🔹 LOGIN
+  // 🔹 LOGIN - Fixed route to include /auth
   async login(email: string, password: string) {
     const response = await this.request<{
       success: boolean;
       user: any;
       token: string;
       error?: string;
-    }>("/api/login", {
+    }>("/api/auth/login", {  // ✅ Fixed: Added /auth segment
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -100,6 +114,39 @@ class ApiService {
     }
 
     return response;
+  }
+
+  // 🔹 FORGOT PASSWORD - Fixed route to include /auth
+  async forgotPassword(email: string) {
+    return await this.request<{
+      success: boolean;
+      message: string;
+    }>("/api/auth/forgot-password", {  // ✅ Fixed: Added /auth segment
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  // 🔹 RESET PASSWORD - Fixed route to include /auth
+  async resetPassword(token: string, email: string, password: string) {
+    return await this.request<{
+      success: boolean;
+      message: string;
+    }>("/api/auth/reset-password", {  // ✅ Fixed: Added /auth segment
+      method: "POST",
+      body: JSON.stringify({ token, email, password }),
+    });
+  }
+
+  // 🔹 VERIFY RESET TOKEN
+  async verifyResetToken(token: string, email: string) {
+    return await this.request<{
+      success: boolean;
+      message: string;
+    }>("/api/auth/verify-reset-token", {  // ✅ Fixed: Added /auth segment
+      method: "POST",
+      body: JSON.stringify({ token, email }),
+    });
   }
 
   // 🔹 PROFILE
