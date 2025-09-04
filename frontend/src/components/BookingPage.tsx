@@ -9,7 +9,7 @@ interface BookingPageProps {
 }
 
 const BookingPage: React.FC<BookingPageProps> = ({ onBack, onBookingComplete }) => {
-  const { user,fetchWithAuth } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingData, setBookingData] = useState({
     // Pickup Details
@@ -28,7 +28,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ onBack, onBookingComplete }) 
     deliveryCity: '',
     deliveryState: '',
     deliveryPincode: '',
-   
+    
     
     // Package Details
     packageType: '',
@@ -144,41 +144,42 @@ const BookingPage: React.FC<BookingPageProps> = ({ onBack, onBookingComplete }) 
   const prevStep = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
-const handleSubmit = async () => {
-  if (validateStep(5)) {
-    try {
-      // Convert pickupDate into proper datetime format
-      const payload = {
-        ...bookingData,
-        pickupDate: new Date(bookingData.pickupDate).toISOString().slice(0, 19).replace("T", " "),
-      };
 
-      const response = await fetchWithAuth("http://localhost:8000/api/bookings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+  const handleSubmit = async () => {
+    if (validateStep(5)) {
+      try {
+        // Convert pickupDate into proper datetime format
+        const payload = {
+          ...bookingData,
+          pickupDate: new Date(bookingData.pickupDate).toISOString().slice(0, 19).replace("T", " "),
+        };
 
-      const result = await response.json();
+        const response = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/api/bookings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
 
-      console.log("📦 Booking API response:", result); // debug
+        const result = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Booking failed");
+        console.log("📦 Booking API response:", result); // debug
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Booking failed");
+        }
+
+        if (onBookingComplete) {
+          onBookingComplete(result.booking.id, result.booking);
+        }
+      } catch (err) {
+        console.error("❌ Booking error:", err);
+        alert("Failed to create booking. Please try again.");
       }
-
-      if (onBookingComplete) {
-        onBookingComplete(result.booking.id, result.booking);
-      }
-    } catch (err) {
-      console.error("❌ Booking error:", err);
-      alert("Failed to create booking. Please try again.");
     }
-  }
-};
+  };
 
   const handleCancelBooking = () => {
     if (window.confirm('Are you sure you want to cancel this booking? All entered data will be lost.')) {
@@ -430,12 +431,6 @@ const handleSubmit = async () => {
                 {errors.packageType && <p className="mt-1 text-sm text-red-600">{errors.packageType}</p>}
               </div>
 
-              
-
-             
-
-             
-
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Package Description *</label>
                 <textarea
@@ -597,7 +592,7 @@ const handleSubmit = async () => {
                     {bookingData.deliveryBuildingName && `, ${bookingData.deliveryBuildingName}`}
                     , {bookingData.deliveryStreet}
                   </p>
-                  
+                  <p className="text-sm text-gray-600 mb-1">{bookingData.deliveryCity}, {bookingData.deliveryState} - {bookingData.deliveryPincode}</p>
                 </div>
 
                 <div>
