@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -19,7 +18,6 @@ interface RegisterProps {
 
 const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
   const { register } = useAuth();
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -141,6 +139,7 @@ const Register: React.FC<RegisterProps> = ({ onBack, onSwitchToLogin }) => {
         pincode: formData.pincode,
       });
       
+      // ✅ FIXED: Use callback prop instead of navigate
       // Navigate to login after successful registration
       setTimeout(() => {
         onSwitchToLogin();

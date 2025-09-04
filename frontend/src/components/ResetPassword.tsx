@@ -1,5 +1,6 @@
-// ResetPassword.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { apiService } from "../services/api";
 
 type ResetPasswordProps = {
   token: string;
@@ -26,14 +27,29 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  // Verify token validity on mount
+  useEffect(() => {
+    const verifyToken = async () => {
+      try {
+        await apiService.verifyResetToken(token, email);
+        // Token is valid, continue with reset
+      } catch (err: any) {
+        setError("Invalid or expired reset link. Please request a new one.");
+      }
+    };
+
+    verifyToken();
+  }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(false);
     setLoading(true);
 
+    // Validate passwords
     if (password !== confirmPassword) {
       setError("Passwords do not match!");
       setLoading(false);
@@ -46,29 +62,21 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
       return;
     }
 
+    // Check for required characters
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      setError("Password must include uppercase, lowercase, and number.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_BASE_URL}/api/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password }),
-      });
-
-      // ✅ Guard against HTML responses (e.g., 500, 404)
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await res.text();
-        console.error("Non-JSON response:", text);
-        throw new Error("Server returned an invalid response. Please try again.");
-      }
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("✅ Password reset successful. Please log in.");
+      // ✅ Use apiService instead of direct fetch
+      await apiService.resetPassword(token, email, password);
+      
+      setSuccess(true);
+      setTimeout(() => {
         setCurrentView("login");
-      } else {
-        setError(data.message || "Failed to reset password.");
-      }
+      }, 2000);
     } catch (err: any) {
       console.error("Reset password error:", err.message);
       setError(
@@ -92,48 +100,63 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-gray-700 text-sm mb-1">New Password</label>
-            <input
-              type="password"
-              placeholder="Enter new password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
-              disabled={loading}
-              required
-            />
+        {success ? (
+          <div className="text-center py-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <p className="text-green-600 font-medium">Password reset successful!</p>
+            <p className="text-gray-600 text-sm mt-2">Redirecting to login...</p>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-gray-700 text-sm mb-1">New Password</label>
+              <input
+                type="password"
+                placeholder="Enter new password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                disabled={loading}
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Must be 8+ characters with uppercase, lowercase, and number
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
-            <input
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+            <div>
+              <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
               disabled={loading}
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Resetting...
-              </>
-            ) : (
-              "Reset Password"
-            )}
-          </button>
-        </form>
+              className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Resetting...
+                </>
+              ) : (
+                "Reset Password"
+              )}
+            </button>
+          </form>
+        )}
 
         <p
           className="text-center text-sm text-gray-600 mt-4 cursor-pointer hover:underline"

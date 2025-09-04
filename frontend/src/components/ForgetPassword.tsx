@@ -36,7 +36,9 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
     }
 
     try {
+      // ✅ Use the forgotPassword method from auth context
       await forgotPassword(email);
+      
       setMessage("✅ Password reset link has been sent to your email.");
       setMessageType("success");
     } catch (err: any) {
@@ -44,14 +46,15 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
 
       // Handle common backend issues gracefully
       if (errorMsg.includes("token '<'")) {
-        errorMsg =
-          "❌ Unable to connect to server. Please check your internet connection.";
+        errorMsg = "❌ Unable to connect to server. Please check your internet connection.";
       } else if (
         errorMsg.toLowerCase().includes("not found") ||
         errorMsg.toLowerCase().includes("invalid") ||
         errorMsg.toLowerCase().includes("no user")
       ) {
         errorMsg = "❌ This email is not registered with us.";
+      } else if (errorMsg.includes("Failed to fetch")) {
+        errorMsg = "❌ Unable to connect to server. Please check your internet connection.";
       }
 
       setMessage(errorMsg);

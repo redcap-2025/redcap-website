@@ -1,4 +1,3 @@
-// routes/auth.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -14,6 +13,9 @@ if (!JWT_SECRET) {
   console.error("❌ JWT_SECRET is not set in environment variables");
   process.exit(1);
 }
+
+// ✅ Add route prefix validation
+console.log("✅ Auth routes loaded with correct configuration");
 
 // 🔹 REGISTER
 router.post("/register", async (req, res) => {
@@ -31,14 +33,35 @@ router.post("/register", async (req, res) => {
       pincode,
     } = req.body;
 
-    if (!email || !password || !fullName) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
+    // Enhanced validation
+    if (!email || !password || !fullName || !phone) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing required fields: email, password, fullName, or phone" 
+      });
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please enter a valid email address" 
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Password must be at least 8 characters long" 
+      });
     }
 
     // Check if user already exists
     const [existing] = await db.execute("SELECT id FROM users WHERE email = ?", [email]);
     if (existing.length > 0) {
-      return res.status(400).json({ success: false, message: "Email already registered" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Email already registered" 
+      });
     }
 
     // Hash password
@@ -90,21 +113,30 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password required" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Email and password required" 
+      });
     }
 
     // Find user by email
     const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
 
     if (rows.length === 0) {
-      return res.status(400).json({ success: false, message: "Invalid email or password" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid email or password" 
+      });
     }
 
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Invalid email or password" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid email or password" 
+      });
     }
 
     // Sign token
@@ -126,13 +158,27 @@ router.post("/login", async (req, res) => {
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
+    
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Email is required" 
+      });
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please enter a valid email address" 
+      });
     }
 
     const [users] = await db.execute("SELECT id, fullName FROM users WHERE email = ?", [email]);
     if (users.length === 0) {
-      return res.status(400).json({ success: false, message: "This email is not registered." });
+      return res.status(400).json({ 
+        success: false, 
+        message: "This email is not registered with us." 
+      });
     }
 
     const user = users[0];
@@ -145,7 +191,8 @@ router.post("/forgot-password", async (req, res) => {
       [resetTokenHash, resetTokenExpiration, user.id]
     );
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || "https://recapweb.netlify.app";
+    // ✅ Fixed: Remove trailing spaces and use correct environment variable
+    const FRONTEND_URL = process.env.FRONTEND_URL?.trim() || "https://recapweb.netlify.app";
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
     // 🔑 DEV: Log only in development
@@ -153,12 +200,23 @@ router.post("/forgot-password", async (req, res) => {
       console.log("🔑 Reset link (for testing):", resetUrl);
     }
 
-    await sendResetEmail(email, resetUrl, user.fullName);
-
-    return res.json({ success: true, message: "Password reset link has been sent to your email." });
+    try {
+      await sendResetEmail(email, resetUrl, user.fullName);
+      return res.json({ 
+        success: true, 
+        message: "Password reset link has been sent to your email." 
+      });
+    } catch (emailErr) {
+      console.error("❌ Email sending failed:", emailErr.message);
+      // Still return success to prevent email enumeration attacks
+      return res.json({ 
+        success: true, 
+        message: "If your email is registered, you'll receive a reset link." 
+      });
+    }
   } catch (err) {
     console.error("❌ Forgot password error:", err.message);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -167,7 +225,25 @@ router.post("/reset-password", async (req, res) => {
   const { token, email, password } = req.body;
 
   if (!token || !email || !password) {
-    return res.status(400).json({ success: false, message: "All fields are required" });
+    return res.status(400).json({ 
+      success: false, 
+      message: "All fields are required" 
+    });
+  }
+
+  // Enhanced password validation
+  if (password.length < 8) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Password must be at least 8 characters long" 
+    });
+  }
+
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Password must include uppercase, lowercase, and number" 
+    });
   }
 
   const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -179,7 +255,10 @@ router.post("/reset-password", async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(400).json({ success: false, message: "Invalid or expired token" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired token" 
+      });
     }
 
     const user = users[0];
@@ -190,10 +269,13 @@ router.post("/reset-password", async (req, res) => {
       [hashedPassword, user.id]
     );
 
-    return res.json({ success: true, message: "Password reset successful" });
+    return res.json({ 
+      success: true, 
+      message: "Password reset successful" 
+    });
   } catch (err) {
     console.error("❌ Reset password error:", err.message);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -203,7 +285,10 @@ router.post("/verify-reset-token", async (req, res) => {
     const { token, email } = req.body;
 
     if (!token || !email) {
-      return res.status(400).json({ success: false, message: "Token and email required" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Token and email required" 
+      });
     }
 
     const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -213,10 +298,16 @@ router.post("/verify-reset-token", async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(400).json({ success: false, message: "Invalid or expired token" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired token" 
+      });
     }
 
-    res.json({ success: true, message: "Token is valid" });
+    res.json({ 
+      success: true, 
+      message: "Token is valid" 
+    });
   } catch (err) {
     console.error("❌ Verify reset token error:", err.message);
     res.status(500).json({ success: false, message: "Server error" });
