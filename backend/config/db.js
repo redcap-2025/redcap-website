@@ -1,49 +1,32 @@
-// db.js
+// config/db.js
 const mysql = require('mysql2/promise');
-
-// 🔒 Validate required environment variables
-if (!process.env.MYSQLHOST || !process.env.MYSQLPORT || !process.env.MYSQLUSER || !process.env.MYSQLPASSWORD) {
-  console.error('❌ Missing required MySQL environment variables. Check Render dashboard.');
-  process.exit(1);
-}
+require('dotenv').config(); // Still load .env (optional, for overrides)
 
 const pool = mysql.createPool({
-  host: process.env.MYSQLHOST,
-  port: parseInt(process.env.MYSQLPORT),
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE || 'railway',
-  ssl: {
-    rejectUnauthorized: false // 🔐 Required for Railway's proxy.rlwy.net
-  },
+  host: '127.0.0.1',           // ✅ Localhost IP (preferred over 'localhost')
+  port: 3306,                  // ✅ Default MySQL port
+  user: 'root',                // ✅ Default user for local MySQL (XAMPP/MAMP)
+  password: '2025',                // ✅ Often empty for local dev
+  database: 'redcap_db',       // ✅ Your database name (must exist)
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  enableKeepAlive: true,        // 💡 Prevent idle timeout
-  keepAliveInitialDelay: 1000,  // ms
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 1000, // Better than 0
+  ssl: false,                  // Not needed for localhost
 });
 
-// ✅ Test connection on startup
+// Test connection
 pool.getConnection()
-  .then(connection => {
-    console.log('✅ Successfully connected to MySQL database');
-    console.log(`👉 Host: ${process.env.MYSQLHOST}:${process.env.MYSQLPORT}`);
+  .then((connection) => {
+    console.log('✅ Database connected successfully');
+    console.log(`👉 Connected to MySQL at ${connection.config.host}:${connection.config.port}`);
     connection.release();
   })
-  .catch(err => {
-    console.error('❌ MySQL connection failed:', err.message);
-    console.error('💡 Check: DB_HOST, DB_PORT, SSL, and network access.');
-    console.error('🔧 Ensure env vars are set in Render Dashboard (not .env file).');
+  .catch((err) => {
+    console.error('❌ Database connection failed:', err.message);
+    console.error('🔧 Check: Is MySQL running? Does database "redcap_db" exist?');
+    process.exit(1); // Exit if DB fails
   });
-
-// 🛡️ Optional: Handle pool errors
-pool.on('error', (err) => {
-  console.error('⚠️ MySQL Pool Error:', err.message);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.log('🔄 Reconnecting...');
-    // Let Render restart the service if needed
-    process.exit(1);
-  }
-});
 
 module.exports = pool;
