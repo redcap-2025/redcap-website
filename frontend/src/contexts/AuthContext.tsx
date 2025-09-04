@@ -1,7 +1,7 @@
 // AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthState } from "../types/user";
-import { apiService } from "../services/api"; // ← Make sure this is correct path
+import { apiService } from "../services/api"; // ← Make sure path is correct
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -82,38 +82,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /** 📝 REGISTER */
-const register = async (userData: Omit<User, "id" | "createdAt">) => {
-  setAuthState((prev) => ({ ...prev, loading: true }));
-  setError(null);
+  const register = async (userData: Omit<User, "id" | "createdAt">) => {
+    setAuthState((prev) => ({ ...prev, loading: true }));
+    setError(null);
 
-  // ✅ Frontend validation (optional but helpful)
-  if (!userData.email || !userData.password || !userData.fullName || !userData.phone) {
-    setError("All fields are required");
-    setAuthState((prev) => ({ ...prev, loading: false }));
-    return;
-  }
-
-  try {
-    const response = await apiService.register(userData);
-
-    if (!response.success || !response.user || !response.token) {
-      throw new Error(response.error || "Registration failed");
+    if (!userData.email || !userData.password || !userData.fullName || !userData.phone) {
+      setError("All fields are required");
+      setAuthState((prev) => ({ ...prev, loading: false }));
+      return;
     }
 
-    setAuthState({ isAuthenticated: true, user: response.user, loading: false });
-  } catch (err: any) {
-    console.error("❌ Registration error:", err.message);
-    
-    // Handle network errors, CORS, 500s, etc.
-    const errorMessage = err.message || "Something went wrong. Please try again.";
-    
-    setError(errorMessage);
-    setAuthState((prev) => ({ ...prev, loading: false }));
-    
-    // Re-throw only if needed for higher-level handling
-    // throw err;
-  }
-};
+    try {
+      const response = await apiService.register(userData);
+      if (!response.success || !response.user || !response.token) {
+        throw new Error(response.error || "Registration failed");
+      }
+      setAuthState({ isAuthenticated: true, user: response.user, loading: false });
+    } catch (err: any) {
+      console.error("❌ Registration error:", err.message);
+      const errorMessage = err.message || "Something went wrong. Please try again.";
+      setError(errorMessage);
+      setAuthState((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   /** 🚪 LOGOUT */
   const logout = () => {
@@ -153,51 +144,51 @@ const register = async (userData: Omit<User, "id" | "createdAt">) => {
     }
   };
 
-/** 📧 FORGOT PASSWORD */
-const forgotPassword = async (email: string) => {
-  setError(null);
-  try {
-    const baseUrl = import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"; // ✅ No spaces
-    const url = `${baseUrl}/api/forgot-password`;
+  /** 📧 FORGOT PASSWORD */
+  const forgotPassword = async (email: string) => {
+    setError(null);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const url = `${API_BASE_URL}/api/forgot-password`; // ✅ Correct variable used
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || "Failed to send reset link");
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to send reset link");
+      }
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
     }
-  } catch (err: any) {
-    setError(err.message);
-    throw err;
-  }
-};
+  };
 
-/** 🔐 RESET PASSWORD */
-const resetPassword = async (token: string, newPassword: string, email: string) => {
-  setError(null);
-  try {
-    const baseUrl = import.meta.env.VITE_API_URL || "https://redcap-website.onrender.com"; // ✅ No spaces
-    const url = `${baseUrl}/api/reset-password`;
+  /** 🔐 RESET PASSWORD */
+  const resetPassword = async (token: string, newPassword: string, email: string) => {
+    setError(null);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"; // ✅ No trailing spaces
+      const url = `${API_BASE_URL}/api/reset-password`; // ✅ Correct URL
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, email, password: newPassword }),
-    });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, email, password: newPassword }),
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || "Failed to reset password");
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to reset password");
+      }
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
     }
-  } catch (err: any) {
-    setError(err.message);
-    throw err;
-  }
-};
+  };
 
   return (
     <AuthContext.Provider
