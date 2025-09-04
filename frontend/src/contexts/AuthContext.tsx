@@ -1,11 +1,11 @@
 // contexts/AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, AuthState } from "../types/user";
-import { apiService } from "../services/api"; // ✅ CORRECTED IMPORT PATH
+import { User, RegisterUserData, AuthState } from "../types/user";
+import { apiService } from "../services/api";
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: Omit<User, "id" | "createdAt">) => Promise<void>;
+  register: (userData: RegisterUserData) => Promise<void>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<User>;
   fetchProfile: () => Promise<void>;
@@ -14,7 +14,6 @@ interface AuthContextType extends AuthState {
   resetPassword: (token: string, newPassword: string, email: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
-  setUser: (user: User) => void; // ✅ Added setUser to context
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,14 +26,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [error, setError] = useState<string | null>(null);
 
-  /** 🔐 Reuse ApiService for authenticated requests */
+  // ✅ Single logout definition
+  const logout = () => {
+    localStorage.removeItem("redcap_token");
+    localStorage.removeItem("redcap_user");
+    apiService.logout();
+    setAuthState({ isAuthenticated: false, user: null, loading: false });
+  };
+
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem("redcap_token");
     const res = await fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
         ...(options.headers || {}),
-        Authorization: `Bearer ${localStorage.getItem("redcap_token")}`,
+        Authorization: token ? `Bearer ${token}` : "",
       },
     });
 
@@ -46,7 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res;
   };
 
-  /** 🔄 Restore session from localStorage */
   useEffect(() => {
     const storedUser = localStorage.getItem("redcap_user");
     if (storedUser) {
@@ -65,35 +71,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearError = () => setError(null);
 
-  /** 🔑 LOGIN */
   const login = async (email: string, password: string) => {
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
       const response = await apiService.login(email, password);
       if (!response.success || !response.user || !response.token) {
-        // ✅ FIXED: Check both error and message fields
         throw new Error(response.error || response.message || "Login failed");
       }
+      localStorage.setItem("redcap_token", response.token);
+      localStorage.setItem("redcap_user", JSON.stringify(response.user));
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
-      // ✅ FIXED: Show specific error message
       const errorMessage = err.message.includes("Invalid email or password")
         ? "Invalid email or password. Please try again."
         : err.message;
-      
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
       throw err;
     }
   };
 
-  /** 📝 REGISTER */
-  const register = async (userData: Omit<User, "id" | "createdAt">) => {
+  const register = async (userData: RegisterUserData) => {
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
 
-    // ✅ Ensure password is defined (fixes TypeScript error)
     if (!userData.email || !userData.password || !userData.fullName || !userData.phone) {
       setError("All fields are required");
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -101,50 +103,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const response = await apiService.register({
-        ...userData,
-        password: userData.password // TypeScript now knows it's defined
-      });
-      
+      const response = await apiService.register(userData);
       if (!response.success || !response.user || !response.token) {
-        // ✅ FIXED: Check both error and message fields
         throw new Error(response.error || response.message || "Registration failed");
       }
+      localStorage.setItem("redcap_token", response.token);
+      localStorage.setItem("redcap_user", JSON.stringify(response.user));
       setAuthState({ isAuthenticated: true, user: response.user, loading: false });
     } catch (err: any) {
       console.error("❌ Registration error:", err.message);
       const errorMessage = err.message.includes("Email already registered")
         ? "This email is already registered. Please try logging in."
         : err.message || "Something went wrong. Please try again.";
-      
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  /** 🚪 LOGOUT */
-  const logout = () => {
-    apiService.logout();
-    setAuthState({ isAuthenticated: false, user: null, loading: false });
-  };
-
-  /** 👤 UPDATE PROFILE */
-  const updateProfile = async (userData: Partial<User>) => {
-    if (!authState.user) throw new Error("No user to update");
+  const updateProfile = async (userData: Partial<User>): Promise<User> => {
+    if (!authState.user) throw new Error("Not authenticated");
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
-    
+
     try {
-      // ✅ Filter out undefined values (fixes TypeScript error)
       const filteredUserData = Object.fromEntries(
         Object.entries(userData).filter(([_, value]) => value !== undefined)
       ) as Partial<User>;
-      
+
       const updated = await apiService.updateProfile(filteredUserData);
       const updatedUser = { ...authState.user, ...updated };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
-      return updatedUser; // ✅ Return updated user
+      return updatedUser;
     } catch (err: any) {
       setError(err.message);
       setAuthState((prev) => ({ ...prev, loading: false }));
@@ -152,7 +142,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /** 🔄 FETCH PROFILE */
   const fetchProfile = async () => {
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
@@ -167,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /** 📧 FORGOT PASSWORD */
   const forgotPassword = async (email: string) => {
     setError(null);
     try {
@@ -178,7 +166,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /** 🔐 RESET PASSWORD */
   const resetPassword = async (token: string, newPassword: string, email: string) => {
     setError(null);
     try {
@@ -187,11 +174,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(err.message);
       throw err;
     }
-  };
-
-  // ✅ Added setUser function
-  const setUser = (newUser: User) => {
-    setAuthState((prev) => ({ ...prev, user: newUser }));
   };
 
   return (
@@ -208,7 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         error,
         clearError,
-        setUser, // ✅ Expose setUser
       }}
     >
       {children}
@@ -216,7 +197,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-/** 🔍 Custom hook for using auth anywhere */
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {

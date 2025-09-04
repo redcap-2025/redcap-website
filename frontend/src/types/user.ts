@@ -1,17 +1,44 @@
-// types/user.ts
+// src/types/user.ts
+
 export interface User {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   phone: string;
-  password?: string; // Only used in forms, not stored in context
+  password?: string;
   doorNumber: string;
   buildingName?: string;
   street: string;
   city: string;
   state: string;
   pincode: string;
-  createdAt: string; // ISO date string: "2025-04-05T10:00:00.000Z"
+  createdAt: string;
+}
+
+// ✅ Add and export RegisterUserData
+export interface RegisterUserData {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  doorNumber: string;
+  buildingName?: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+// Optional: For profile updates
+export interface UpdateUserData {
+  fullName?: string;
+  phone?: string;
+  doorNumber?: string;
+  buildingName?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
 }
 
 export interface AuthState {
