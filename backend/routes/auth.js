@@ -203,49 +203,45 @@ router.post("/forgot-password", async (req, res) => {
     }
 
     const [users] = await db.execute("SELECT id, fullName FROM users WHERE email = ?", [email]);
-    if (users.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "This email is not registered with us." 
-      });
+    
+    // For security: Always return a generic success message to prevent email enumeration
+    // Even if user doesn't exist, proceed but don't send email
+    if (users.length > 0) {
+      const user = users[0];
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+      const resetTokenExpiration = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await db.execute(
+        "UPDATE users SET resetToken = ?, resetTokenExpiration = ? WHERE id = ?",
+        [resetTokenHash, resetTokenExpiration, user.id]
+      );
+
+      // ✅ FIXED: Remove trailing spaces in URL
+      const FRONTEND_URL = process.env.FRONTEND_URL?.trim() || "https://recapweb.netlify.app";
+      const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+
+      // 🔑 DEV: Log only in development
+      if (process.env.NODE_ENV !== "production") {
+        console.log("🔑 Reset link (for testing):", resetUrl);
+      }
+
+      try {
+        await sendResetEmail(email, resetUrl, user.fullName);
+      } catch (emailErr) {
+        console.error("❌ Email sending failed:", {
+          message: emailErr.message,
+          stack: emailErr.stack
+        });
+        // Continue with generic response
+      }
     }
 
-    const user = users[0];
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
-    const resetTokenExpiration = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await db.execute(
-      "UPDATE users SET resetToken = ?, resetTokenExpiration = ? WHERE id = ?",
-      [resetTokenHash, resetTokenExpiration, user.id]
-    );
-
-    // ✅ FIXED: Remove trailing spaces in URL
-    const FRONTEND_URL = process.env.FRONTEND_URL?.trim() || "https://recapweb.netlify.app";
-    const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
-
-    // 🔑 DEV: Log only in development
-    if (process.env.NODE_ENV !== "production") {
-      console.log("🔑 Reset link (for testing):", resetUrl);
-    }
-
-    try {
-      await sendResetEmail(email, resetUrl, user.fullName);
-      return res.json({ 
-        success: true, 
-        message: "Password reset link has been sent to your email." 
-      });
-    } catch (emailErr) {
-      console.error("❌ Email sending failed:", {
-        message: emailErr.message,
-        stack: emailErr.stack
-      });
-      // Still return success to prevent email enumeration attacks
-      return res.json({ 
-        success: true, 
-        message: "If your email is registered, you'll receive a reset link." 
-      });
-    }
+    // Generic response for security
+    return res.json({ 
+      success: true, 
+      message: "If your email is registered, you'll receive a reset link." 
+    });
   } catch (err) {
     console.error("❌ Forgot password error details:", {
       message: err.message,

@@ -1,4 +1,3 @@
-// contexts/AuthProvider.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthState } from "../types/user";
 import { apiService } from "../services/api"; // ✅ CORRECTED IMPORT PATH
@@ -118,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       setError(errorMessage);
       setAuthState((prev) => ({ ...prev, loading: false }));
+      throw err; // Added for consistency with login
     }
   };
 
@@ -139,8 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Object.entries(userData).filter(([_, value]) => value !== undefined)
       ) as Partial<User>;
       
-      const updated = await apiService.updateProfile(filteredUserData);
-      const updatedUser = { ...authState.user, ...updated };
+      const response = await apiService.updateProfile(filteredUserData) as { success: boolean; user?: any; error?: string; message?: string };
+      if (!response.success) {
+        throw new Error(response.error || response.message || "Profile update failed");
+      }
+      if (!response.user) {
+        throw new Error("Updated user data not received");
+      }
+      const updatedUser = { ...authState.user, ...response.user };
       localStorage.setItem("redcap_user", JSON.stringify(updatedUser));
       setAuthState({ isAuthenticated: true, user: updatedUser, loading: false });
     } catch (err: any) {
@@ -155,8 +161,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthState((prev) => ({ ...prev, loading: true }));
     setError(null);
     try {
-      const data = await apiService.getProfile();
-      const mergedUser = { ...authState.user, ...data.user } as User;
+      const response = await apiService.getProfile() as { success: boolean; user?: any; error?: string; message?: string };
+      if (!response.success) {
+        throw new Error(response.error || response.message || "Failed to fetch profile");
+      }
+      if (!response.user) {
+        throw new Error("User data not received");
+      }
+      const mergedUser = { ...authState.user, ...response.user } as User;
       localStorage.setItem("redcap_user", JSON.stringify(mergedUser));
       setAuthState({ isAuthenticated: true, user: mergedUser, loading: false });
     } catch (err: any) {

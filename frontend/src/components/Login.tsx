@@ -1,4 +1,3 @@
-// components/Login.tsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
@@ -34,6 +33,11 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
     }
   }, [isAuthenticated, onBack]);
 
+  // Clear server error on component mount
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -52,8 +56,8 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
     }
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -66,7 +70,7 @@ const Login: React.FC<LoginProps> = ({ onBack, onSwitchToRegister, onForgotPassw
     try {
       await login(formData.email, formData.password);
     } catch (err: any) {
-      // Error already handled by context, but you can log for debugging
+      // Error already handled by context, but log for debugging
       console.error("Login failed:", err.message);
     }
   };
