@@ -1,7 +1,13 @@
 // services/api.ts
 
 // ✅ Use environment variable (recommended)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL?.trim() || "http://localhost:8000";
+
+// 🔍 Validate API URL at runtime
+if (!API_BASE_URL.startsWith("http")) {
+  console.error("❌ Invalid VITE_API_URL:", API_BASE_URL);
+  throw new Error("Invalid API URL. Must start with http:// or https://");
+}
 
 class ApiService {
   private token: string | null = null;
@@ -11,9 +17,12 @@ class ApiService {
   }
 
   /**
-   * Generic request handler with auth & JSON support
+   * Generic request handler with auth, JSON support, and robust error handling
    */
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
     const url = new URL(endpoint, API_BASE_URL).href;
 
     const headers: Record<string, string> = {
@@ -31,55 +40,64 @@ class ApiService {
         headers,
       });
 
-      // ✅ Guard against HTML responses (e.g., 404, 500, bad URL)
+      // ✅ Guard against non-JSON responses (e.g., HTML error pages)
       const contentType = response.headers.get("content-type");
       if (!contentType?.includes("application/json")) {
         const text = await response.text();
-        console.error("❌ Non-JSON response received:", text);
+        console.error("❌ Non-JSON response from server:", text);
         throw new Error(
-          "Server returned an invalid response. Check your internet connection and API URL."
+          "Server returned an invalid response. Check your internet connection or contact support."
         );
       }
 
-      // ✅ FIXED: Correct type assertion syntax
-      const data = await response.json() as T & { 
-        success?: boolean; 
-        error?: string; 
-        message?: string 
+      const data = (await response.json()) as T & {
+        success?: boolean;
+        error?: string;
+        message?: string;
       };
 
-      // ✅ Handle API-level errors (400, 401, 500 with JSON body)
+      // ✅ Handle API-level errors (4xx, 5xx with JSON body)
       if (!response.ok) {
-        const errorMsg = data?.error || data?.message || 
-          (response.status === 404 ? "Endpoint not found. Check API route structure." : response.statusText) || 
-          "Request failed";
+        const errorMsg =
+          data.message ||
+          data.error ||
+          response.statusText ||
+          "Request failed due to server error.";
         throw new Error(errorMsg);
       }
 
       return data;
     } catch (error: any) {
       // ✅ Improve user-friendly error messages
-      if (error.message.includes("Failed to fetch")) {
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
         throw new Error(
-          "Unable to connect to server. Please check your internet or try again later."
+          "Unable to connect to the server. Please check your internet connection."
         );
       }
+
       if (error.message.includes("Unexpected token '<'")) {
         throw new Error(
-          "Invalid API URL or server error. Check VITE_API_URL in .env."
+          `Invalid API response. Check if the backend is running at ${API_BASE_URL}.`
         );
       }
+
+      if (error.message.includes("Invalid API URL")) {
+        throw new Error(
+          "Configuration error: Please check VITE_API_URL in your .env file."
+        );
+      }
+
       console.error("API Request failed:", error);
-      throw error;
+      throw new Error(error.message || "An unknown error occurred.");
     }
   }
 
-  // 🔹 REGISTER - Fixed route structure and TypeScript issues
+  // 🔹 AUTH: REGISTER
   async register(userData: {
     fullName: string;
     email: string;
     phone: string;
-    password: string;  // Now required (handled by frontend validation)
+    password: string;
     doorNumber: string;
     buildingName?: string;
     street: string;
@@ -91,8 +109,7 @@ class ApiService {
       success: boolean;
       user: any;
       token: string;
-      error?: string;
-      message?: string; // ✅ Added message field
+      message?: string;
     }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(userData),
@@ -105,14 +122,13 @@ class ApiService {
     return response;
   }
 
-  // 🔹 LOGIN - Fixed error message handling
+  // 🔹 AUTH: LOGIN
   async login(email: string, password: string) {
     const response = await this.request<{
       success: boolean;
       user: any;
       token: string;
-      error?: string;
-      message?: string; // ✅ Added message field
+      message?: string;
     }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -125,44 +141,51 @@ class ApiService {
     return response;
   }
 
-  // 🔹 FORGOT PASSWORD - Fixed route structure
+  // 🔹 AUTH: FORGOT PASSWORD
   async forgotPassword(email: string) {
-    return await this.request<{
+    const response = await this.request<{
       success: boolean;
       message: string;
     }>("/api/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
     });
+
+    return response;
   }
 
-  // 🔹 RESET PASSWORD - Fixed route structure
+  // 🔹 AUTH: RESET PASSWORD
   async resetPassword(token: string, email: string, password: string) {
-    return await this.request<{
+    const response = await this.request<{
       success: boolean;
       message: string;
     }>("/api/auth/reset-password", {
       method: "POST",
       body: JSON.stringify({ token, email, password }),
     });
+
+    return response;
   }
 
-  // 🔹 VERIFY RESET TOKEN
+  // 🔹 AUTH: VERIFY RESET TOKEN
   async verifyResetToken(token: string, email: string) {
-    return await this.request<{
+    const response = await this.request<{
       success: boolean;
       message: string;
     }>("/api/auth/verify-reset-token", {
       method: "POST",
       body: JSON.stringify({ token, email }),
     });
+
+    return response;
   }
 
-  // 🔹 PROFILE
+  // 🔹 PROFILE: GET
   async getProfile() {
     return await this.request<{ success: boolean; user: any }>("/api/profile");
   }
 
+  // 🔹 PROFILE: UPDATE
   async updateProfile(userData: {
     fullName?: string;
     phone?: string;
@@ -179,7 +202,7 @@ class ApiService {
     });
   }
 
-  // 🔹 BOOKINGS
+  // 🔹 BOOKINGS: CREATE
   async createBooking(bookingData: {
     senderName: string;
     senderPhone: string;
@@ -209,17 +232,21 @@ class ApiService {
     });
   }
 
+  // 🔹 BOOKINGS: LIST ALL
   async getUserBookings() {
     return await this.request<{ success: boolean; bookings: any[] }>("/api/bookings");
   }
 
+  // 🔹 BOOKINGS: GET BY ID
   async getBookingById(id: string) {
     return await this.request<{ success: boolean; booking: any }>(`/api/bookings/${id}`);
   }
 
-  // 🔹 HEALTH CHECK
+  // 🔹 HEALTH CHECK (for debugging or status)
   async healthCheck() {
-    return await this.request<{ success: boolean; message: string; timestamp: string }>("/health");
+    return await this.request<{ success: boolean; message: string; timestamp?: string }>(
+      "/api/health"
+    );
   }
 
   // 🔹 AUTH HELPERS
@@ -241,9 +268,22 @@ class ApiService {
 
   getStoredUser() {
     const userStr = localStorage.getItem("redcap_user");
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.error("❌ Failed to parse stored user:", e);
+      this.logout(); // Clear corrupted data
+      return null;
+    }
+  }
+
+  // Optional: Refresh token logic (if needed later)
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem("redcap_token", token);
   }
 }
 
+// 🔥 Export singleton instance
 export const apiService = new ApiService();
 export default apiService;

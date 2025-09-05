@@ -16,13 +16,10 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Clear previous states
     setMessage("");
     setMessageType("");
-    clearError(); // Clear global auth error
+    clearError();
 
-    // Validate email
     if (!email) {
       setMessage("Email is required.");
       setMessageType("error");
@@ -39,31 +36,27 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
 
     try {
       await forgotPassword(email);
-      
-      // ✅ Success: Show confirmation (even if email doesn't exist — security)
+
       setMessage("Password reset link has been sent to your email.");
       setMessageType("success");
-      setEmail(""); // Clear email after success
+      setEmail("");
     } catch (err: any) {
-      // Error is already set in `useAuth`, but we can enhance UX
-      const errorMsg = authError || err.message || "Failed to send reset link. Please try again.";
+      let errorMsg = authError || err.message || "Something went wrong.";
 
-      // Refine message for better UX
-      let displayMsg = errorMsg;
+      // Improve user-facing messages
       if (errorMsg.includes("Failed to fetch")) {
-        displayMsg = "Unable to connect to server. Please check your internet connection.";
-      } else if (errorMsg.includes("token '<'")) {
-        displayMsg = "Invalid API URL or network error. Please contact support.";
+        errorMsg = "Unable to connect to server. Please check your internet.";
+      } else if (errorMsg.includes("NetworkError")) {
+        errorMsg = "Network error. Please try again later.";
       }
 
-      setMessage(displayMsg);
+      setMessage(errorMsg);
       setMessageType("error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Clear local message when user starts typing again
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
     if (message) {
@@ -75,7 +68,6 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Back Button */}
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-red-600 hover:text-red-700 mb-6 transition-colors"
@@ -85,18 +77,15 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
           Back
         </button>
 
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-red-100">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
             <p className="text-gray-600 text-sm mt-1">
-              Enter your registered email address to receive a password reset link.
+              Enter your registered email to receive a reset link.
             </p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -115,7 +104,6 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* Success/Error Message */}
             {message && (
               <div
                 className={`p-4 rounded-lg border flex items-start gap-2 text-sm ${
@@ -134,14 +122,13 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
                   <p>{message}</p>
                   {messageType === "success" && (
                     <p className="text-xs mt-1 text-green-600">
-                      Please check your inbox and spam folder. The link will expire in 1 hour.
+                      Check your inbox and spam folder. Link expires in 1 hour.
                     </p>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -150,7 +137,7 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Sending Reset Link...
+                  Sending...
                 </>
               ) : (
                 "Send Reset Link"
@@ -158,10 +145,9 @@ const ForgetPassword: React.FC<ForgetPasswordProps> = ({ onBack }) => {
             </button>
           </form>
 
-          {/* Info Box */}
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700">
-              <strong>Note:</strong> For security, no confirmation is shown if the email isn’t registered.
+              <strong>Note:</strong> For security, we won't confirm if your email is registered.
             </p>
           </div>
         </div>

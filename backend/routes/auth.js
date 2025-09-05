@@ -3,7 +3,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const db = require("../config/db"); // Ensure correct path
+const db = require("../config/db");
 const { sendResetEmail } = require("../utils/emailService");
 
 const router = express.Router();
@@ -12,20 +12,19 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error("❌ CRITICAL: JWT_SECRET is not set in environment variables");
-  console.error("Authentication will NOT work without JWT_SECRET");
-} else {
-  console.log("✅ JWT_SECRET is configured");
+  process.exit(1); // Crash early in production
 }
+console.log("✅ JWT_SECRET is configured");
 
 // 🌐 Validate FRONTEND_URL
 const FRONTEND_URL = process.env.FRONTEND_URL?.trim();
 if (!FRONTEND_URL) {
   console.warn("🔶 WARNING: FRONTEND_URL is not set. Using fallback.");
 }
-const FINAL_FRONTEND_URL = FRONTEND_URL || "https://recapweb.netlify.app";
+const FINAL_FRONTEND_URL = FRONTEND_URL || "https://recapweb.netlify.app"; // ✅ Fixed: no trailing spaces
 console.log(`🌐 Frontend URL: ${FINAL_FRONTEND_URL}`);
 
-// ✅ Health check route (optional, for debugging)
+// ✅ Health check
 router.get("/health", (req, res) => {
   res.json({ success: true, message: "Auth service is running" });
 });
@@ -46,36 +45,34 @@ router.post("/register", async (req, res) => {
       pincode,
     } = req.body;
 
-    // Enhanced validation
     if (!email || !password || !fullName || !phone || !pincode) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: email, password, fullName, phone, or pincode",
+        message: "Missing required fields",
       });
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid email address",
+        message: "Invalid email format",
       });
     }
 
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters long",
+        message: "Password must be at least 8 characters",
       });
     }
 
     if (!/^\d{6}$/.test(pincode)) {
       return res.status(400).json({
         success: false,
-        message: "Pincode must be a 6-digit number",
+        message: "Pincode must be 6 digits",
       });
     }
 
-    // Check if user already exists
     const [existing] = await db.execute("SELECT id FROM users WHERE email = ?", [email]);
     if (existing.length > 0) {
       return res.status(400).json({
@@ -84,10 +81,8 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert new user
     const [result] = await db.execute(
       `INSERT INTO users 
         (fullName, email, phone, password, doorNumber, buildingName, street, city, state, pincode) 
@@ -107,8 +102,6 @@ router.post("/register", async (req, res) => {
     );
 
     const userId = result.insertId;
-
-    // Fetch inserted user (without password)
     const [rows] = await db.execute(
       `SELECT id, fullName, email, phone, doorNumber, buildingName, street, city, state, pincode 
        FROM users WHERE id = ?`,
@@ -116,22 +109,15 @@ router.post("/register", async (req, res) => {
     );
 
     const user = rows[0];
-
-    // Create JWT token
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
 
     res.json({ success: true, token, user });
   } catch (err) {
-    console.error("❌ Register error details:", {
-      message: err.message,
-      code: err.code,
-      sql: err.sql,
-      sqlMessage: err.sqlMessage,
-    });
+    console.error("❌ Register error:", err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+      ...(process.env.NODE_ENV === "development" && { error: err.message }),
     });
   }
 });
@@ -142,29 +128,18 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password required",
-      });
+      return res.status(400).json({ success: false, message: "Email and password required" });
     }
 
     const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
-
     if (rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
     }
 
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
     }
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
@@ -175,16 +150,11 @@ router.post("/login", async (req, res) => {
 
     res.json({ success: true, token, user });
   } catch (err) {
-    console.error("❌ Login error details:", {
-      message: err.message,
-      code: err.code,
-      sql: err.sql,
-      sqlMessage: err.sqlMessage,
-    });
+    console.error("❌ Login error:", err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+      ...(process.env.NODE_ENV === "development" && { error: err.message }),
     });
   }
 });
@@ -194,24 +164,16 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Valid email is required",
       });
     }
 
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please enter a valid email address",
-      });
-    }
-
-    // ✅ SECURITY: Always return success unless format is invalid
     const [users] = await db.execute("SELECT id, fullName FROM users WHERE email = ?", [email]);
     if (users.length === 0) {
-      // Don't reveal if email exists
+      // ✅ Security: Don't reveal non-existence
       return res.json({
         success: true,
         message: "If your email is registered, you'll receive a reset link.",
@@ -228,23 +190,20 @@ router.post("/forgot-password", async (req, res) => {
       [resetTokenHash, resetTokenExpiration, user.id]
     );
 
-    // ✅ FIXED: Clean URL with no trailing spaces
-    const resetUrl = `${REACT_APP_FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+    // ✅ FIXED: Use FINAL_FRONTEND_URL, not REACT_APP_FRONTEND_URL
+    const resetUrl = `${FINAL_FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
-    // 🔑 DEV: Log only in development
+    // 🔑 DEV: Log reset link only in dev
     if (process.env.NODE_ENV !== "production") {
-      console.log("🔑 Reset link (for testing):", resetUrl);
+      console.log("🔑 Reset link:", resetUrl);
     }
 
     try {
       await sendResetEmail(email, resetUrl, user.fullName);
-      console.log(`✅ Reset email sent to ${email}`);
+      console.log(`✅ Password reset email sent to ${email}`);
     } catch (emailErr) {
-      console.error("❌ Email sending failed:", {
-        message: emailErr.message,
-        stack: emailErr.stack,
-      });
-      // Continue — don't fail the request
+      console.error("📧 Failed to send email:", emailErr.message);
+      // Continue — don't expose email failure
     }
 
     // ✅ Always return generic success
@@ -253,16 +212,11 @@ router.post("/forgot-password", async (req, res) => {
       message: "If your email is registered, you'll receive a reset link.",
     });
   } catch (err) {
-    console.error("❌ Forgot password error details:", {
-      message: err.message,
-      code: err.code,
-      sql: err.sql,
-      sqlMessage: err.sqlMessage,
-    });
+    console.error("❌ Forgot password error:", err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+      ...(process.env.NODE_ENV === "development" && { error: err.message }),
     });
   }
 });
@@ -278,11 +232,10 @@ router.post("/reset-password", async (req, res) => {
     });
   }
 
-  // Enhanced password validation
   if (password.length < 8) {
     return res.status(400).json({
       success: false,
-      message: "Password must be at least 8 characters long",
+      message: "Password must be at least 8 characters",
     });
   }
 
@@ -321,21 +274,16 @@ router.post("/reset-password", async (req, res) => {
       message: "Password reset successful",
     });
   } catch (err) {
-    console.error("❌ Reset password error details:", {
-      message: err.message,
-      code: err.code,
-      sql: err.sql,
-      sqlMessage: err.sqlMessage,
-    });
+    console.error("❌ Reset password error:", err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+      ...(process.env.NODE_ENV === "development" && { error: err.message }),
     });
   }
 });
 
-// 🔹 VERIFY RESET TOKEN (Frontend pre-check)
+// 🔹 VERIFY RESET TOKEN
 router.post("/verify-reset-token", async (req, res) => {
   try {
     const { token, email } = req.body;
@@ -360,21 +308,13 @@ router.post("/verify-reset-token", async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: "Token is valid",
-    });
+    res.json({ success: true, message: "Token is valid" });
   } catch (err) {
-    console.error("❌ Verify reset token error details:", {
-      message: err.message,
-      code: err.code,
-      sql: err.sql,
-      sqlMessage: err.sqlMessage,
-    });
+    console.error("❌ Verify token error:", err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+      ...(process.env.NODE_ENV === "development" && { error: err.message }),
     });
   }
 });
