@@ -1,5 +1,5 @@
+// components/ResetPassword.tsx
 import React, { useState, useEffect } from "react";
-
 import { apiService } from "../services/api";
 
 type ResetPasswordProps = {
@@ -29,27 +29,30 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Verify token validity on mount
+  // 🔍 Verify token validity on mount
   useEffect(() => {
     const verifyToken = async () => {
       try {
         await apiService.verifyResetToken(token, email);
-        // Token is valid, continue with reset
+        // Token is valid — proceed
       } catch (err: any) {
         setError("Invalid or expired reset link. Please request a new one.");
       }
     };
 
-    verifyToken();
+    if (!token || !email) {
+      setError("Missing reset information. Please use the link from your email.");
+    } else {
+      verifyToken();
+    }
   }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(false);
     setLoading(true);
 
-    // Validate passwords
+    // 🔐 Password Validation
     if (password !== confirmPassword) {
       setError("Passwords do not match!");
       setLoading(false);
@@ -62,23 +65,22 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
       return;
     }
 
-    // Check for required characters
     if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      setError("Password must include uppercase, lowercase, and number.");
+      setError("Password must include uppercase, lowercase, and a number.");
       setLoading(false);
       return;
     }
 
     try {
-      // ✅ Use apiService instead of direct fetch
       await apiService.resetPassword(token, email, password);
-      
       setSuccess(true);
+
+      // Navigate after feedback
       setTimeout(() => {
         setCurrentView("login");
       }, 2000);
     } catch (err: any) {
-      console.error("Reset password error:", err.message);
+      console.error("Reset password error:", err);
       setError(
         err.message.includes("Failed to fetch")
           ? "Unable to connect to server. Please check your internet connection."
@@ -95,16 +97,32 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
         <h2 className="text-2xl font-bold text-center text-red-600 mb-6">🔐 Reset Your Password</h2>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+          <div
+            className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
         {success ? (
-          <div className="text-center py-6">
+          <div className="text-center py-6" aria-live="polite">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              <svg
+                className="w-8 h-8 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+              <title>Password reset successful</title>
+<path
+  strokeLinecap="round"
+  strokeLinejoin="round"
+  strokeWidth="2"
+  d="M5 13l4 4L19 7"
+  aria-hidden="true"
+/>
               </svg>
             </div>
             <p className="text-green-600 font-medium">Password reset successful!</p>
@@ -113,14 +131,18 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-gray-700 text-sm mb-1">New Password</label>
+              <label htmlFor="new-password" className="block text-gray-700 text-sm mb-1">
+                New Password
+              </label>
               <input
+                id="new-password"
                 type="password"
                 placeholder="Enter new password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 disabled:bg-gray-100"
                 disabled={loading}
+                autoComplete="new-password"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -129,14 +151,18 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
             </div>
 
             <div>
-              <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
+              <label htmlFor="confirm-password" className="block text-gray-700 text-sm mb-1">
+                Confirm Password
+              </label>
               <input
+                id="confirm-password"
                 type="password"
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 disabled:bg-gray-100"
                 disabled={loading}
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -159,8 +185,16 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ token, email, setCurrentV
         )}
 
         <p
-          className="text-center text-sm text-gray-600 mt-4 cursor-pointer hover:underline"
+          className="text-center text-sm text-gray-600 mt-4 cursor-pointer hover:underline hover:text-red-600 transition"
           onClick={() => setCurrentView("login")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCurrentView("login");
+            }
+          }}
         >
           Back to Login
         </p>

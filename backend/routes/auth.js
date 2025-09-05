@@ -1,3 +1,4 @@
+// routes/authRoutes.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -7,18 +8,27 @@ const { sendResetEmail } = require("../utils/emailService");
 
 const router = express.Router();
 
-// 🔐 Use JWT_SECRET from environment
+// 🔐 Validate JWT_SECRET
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error("❌ JWT_SECRET is not set in environment variables");
-  // Don't exit the entire process, just log the error
-  console.error("Authentication routes will not be available");
+  console.error("❌ CRITICAL: JWT_SECRET is not set in environment variables");
+  console.error("Authentication will NOT work without JWT_SECRET");
 } else {
-  console.log("✅ JWT_SECRET is properly configured");
+  console.log("✅ JWT_SECRET is configured");
 }
 
-// ✅ Add route prefix validation
-console.log("✅ Auth routes loaded with correct configuration");
+// 🌐 Validate FRONTEND_URL
+const FRONTEND_URL = process.env.FRONTEND_URL?.trim();
+if (!FRONTEND_URL) {
+  console.warn("🔶 WARNING: FRONTEND_URL is not set. Using fallback.");
+}
+const FINAL_FRONTEND_URL = FRONTEND_URL || "https://recapweb.netlify.app";
+console.log(`🌐 Frontend URL: ${FINAL_FRONTEND_URL}`);
+
+// ✅ Health check route (optional, for debugging)
+router.get("/health", (req, res) => {
+  res.json({ success: true, message: "Auth service is running" });
+});
 
 // 🔹 REGISTER
 router.post("/register", async (req, res) => {
@@ -38,40 +48,39 @@ router.post("/register", async (req, res) => {
 
     // Enhanced validation
     if (!email || !password || !fullName || !phone || !pincode) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Missing required fields: email, password, fullName, phone, or pincode" 
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: email, password, fullName, phone, or pincode",
       });
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please enter a valid email address" 
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
       });
     }
 
     if (password.length < 8) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Password must be at least 8 characters long" 
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long",
       });
     }
 
-    // Validate pincode format (6 digits)
     if (!/^\d{6}$/.test(pincode)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Pincode must be a 6-digit number" 
+      return res.status(400).json({
+        success: false,
+        message: "Pincode must be a 6-digit number",
       });
     }
 
     // Check if user already exists
     const [existing] = await db.execute("SELECT id FROM users WHERE email = ?", [email]);
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email already registered" 
+      return res.status(400).json({
+        success: false,
+        message: "Email already registered",
       });
     }
 
@@ -89,11 +98,11 @@ router.post("/register", async (req, res) => {
         phone,
         hashedPassword,
         doorNumber,
-        buildingName,
+        buildingName || null,
         street,
         city,
         state,
-        pincode.toString(), // Ensure pincode is treated as string
+        pincode.toString(),
       ]
     );
 
@@ -117,12 +126,12 @@ router.post("/register", async (req, res) => {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage
+      sqlMessage: err.sqlMessage,
     });
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
@@ -133,19 +142,18 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email and password required" 
+      return res.status(400).json({
+        success: false,
+        message: "Email and password required",
       });
     }
 
-    // Find user by email
     const [rows] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
 
     if (rows.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid email or password" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
       });
     }
 
@@ -153,16 +161,14 @@ router.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid email or password" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
       });
     }
 
-    // Sign token
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
 
-    // Remove sensitive data
     delete user.password;
     delete user.resetToken;
     delete user.resetTokenExpiration;
@@ -173,12 +179,12 @@ router.post("/login", async (req, res) => {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage
+      sqlMessage: err.sqlMessage,
     });
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
@@ -187,26 +193,28 @@ router.post("/login", async (req, res) => {
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
       });
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please enter a valid email address" 
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
       });
     }
 
+    // ✅ SECURITY: Always return success unless format is invalid
     const [users] = await db.execute("SELECT id, fullName FROM users WHERE email = ?", [email]);
     if (users.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "This email is not registered with us." 
+      // Don't reveal if email exists
+      return res.json({
+        success: true,
+        message: "If your email is registered, you'll receive a reset link.",
       });
     }
 
@@ -220,9 +228,8 @@ router.post("/forgot-password", async (req, res) => {
       [resetTokenHash, resetTokenExpiration, user.id]
     );
 
-    // ✅ FIXED: Remove trailing spaces in URL
-    const FRONTEND_URL = process.env.FRONTEND_URL?.trim() || "https://recapweb.netlify.app";
-    const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+    // ✅ FIXED: Clean URL with no trailing spaces
+    const resetUrl = `${REACT_APP_FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
     // 🔑 DEV: Log only in development
     if (process.env.NODE_ENV !== "production") {
@@ -231,32 +238,31 @@ router.post("/forgot-password", async (req, res) => {
 
     try {
       await sendResetEmail(email, resetUrl, user.fullName);
-      return res.json({ 
-        success: true, 
-        message: "Password reset link has been sent to your email." 
-      });
+      console.log(`✅ Reset email sent to ${email}`);
     } catch (emailErr) {
       console.error("❌ Email sending failed:", {
         message: emailErr.message,
-        stack: emailErr.stack
+        stack: emailErr.stack,
       });
-      // Still return success to prevent email enumeration attacks
-      return res.json({ 
-        success: true, 
-        message: "If your email is registered, you'll receive a reset link." 
-      });
+      // Continue — don't fail the request
     }
+
+    // ✅ Always return generic success
+    return res.json({
+      success: true,
+      message: "If your email is registered, you'll receive a reset link.",
+    });
   } catch (err) {
     console.error("❌ Forgot password error details:", {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage
+      sqlMessage: err.sqlMessage,
     });
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
@@ -266,24 +272,24 @@ router.post("/reset-password", async (req, res) => {
   const { token, email, password } = req.body;
 
   if (!token || !email || !password) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "All fields are required" 
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required",
     });
   }
 
   // Enhanced password validation
   if (password.length < 8) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Password must be at least 8 characters long" 
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 8 characters long",
     });
   }
 
   if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Password must include uppercase, lowercase, and number" 
+    return res.status(400).json({
+      success: false,
+      message: "Password must include uppercase, lowercase, and number",
     });
   }
 
@@ -296,9 +302,9 @@ router.post("/reset-password", async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid or expired token" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
       });
     }
 
@@ -310,21 +316,21 @@ router.post("/reset-password", async (req, res) => {
       [hashedPassword, user.id]
     );
 
-    return res.json({ 
-      success: true, 
-      message: "Password reset successful" 
+    return res.json({
+      success: true,
+      message: "Password reset successful",
     });
   } catch (err) {
     console.error("❌ Reset password error details:", {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage
+      sqlMessage: err.sqlMessage,
     });
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
@@ -335,9 +341,9 @@ router.post("/verify-reset-token", async (req, res) => {
     const { token, email } = req.body;
 
     if (!token || !email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Token and email required" 
+      return res.status(400).json({
+        success: false,
+        message: "Token and email required",
       });
     }
 
@@ -348,27 +354,27 @@ router.post("/verify-reset-token", async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid or expired token" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
       });
     }
 
-    res.json({ 
-      success: true, 
-      message: "Token is valid" 
+    res.json({
+      success: true,
+      message: "Token is valid",
     });
   } catch (err) {
     console.error("❌ Verify reset token error details:", {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage
+      sqlMessage: err.sqlMessage,
     });
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Server error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });
