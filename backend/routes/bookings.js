@@ -55,7 +55,7 @@ function mapToDb(body, userId, trackingCode, status, serviceType) {
 }
 
 // 🔹 POST /api/bookings - Create a new booking
-router.post("/bookings", auth, async (req, res) => {
+router.post("/", auth, async (req, res) => {
   try {
     const body = req.body || {};
     const userId = req.user.id;
@@ -125,7 +125,7 @@ router.post("/bookings", auth, async (req, res) => {
 });
 
 // 🔹 GET /api/bookings - Get all user bookings
-router.get("/bookings", auth, async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
     const [rows] = await db.execute(
       `SELECT * FROM bookings WHERE userId = ? ORDER BY createdAt DESC`,
@@ -139,7 +139,7 @@ router.get("/bookings", auth, async (req, res) => {
 });
 
 // 🔹 GET /api/bookings/:id - Get single booking
-router.get("/bookings/:id", auth, async (req, res) => {
+router.get("/:id", auth, async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await db.execute(
