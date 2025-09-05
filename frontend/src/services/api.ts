@@ -1,7 +1,9 @@
 // services/api.ts
 
-// ✅ Use environment variable (recommended)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// ✅ Use environment variable (recommended) with fallback & trailing slash fix
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
 
 class ApiService {
   private token: string | null = null;
@@ -13,8 +15,11 @@ class ApiService {
   /**
    * Generic request handler with auth & JSON support
    */
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = new URL(endpoint, API_BASE_URL).href;
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -31,7 +36,7 @@ class ApiService {
         headers,
       });
 
-      // ✅ Guard against HTML responses (e.g., 404, 500, bad URL)
+      // ✅ Guard against HTML responses (e.g., 404 page, 500 error)
       const contentType = response.headers.get("content-type");
       if (!contentType?.includes("application/json")) {
         const text = await response.text();
@@ -41,18 +46,27 @@ class ApiService {
         );
       }
 
-      // ✅ FIXED: Correct type assertion syntax
-      const data = await response.json() as T & { 
-        success?: boolean; 
-        error?: string; 
-        message?: string 
+      const data = (await response.json()) as T & {
+        success?: boolean;
+        error?: string;
+        message?: string;
       };
 
       // ✅ Handle API-level errors (400, 401, 500 with JSON body)
       if (!response.ok) {
-        const errorMsg = data?.error || data?.message || 
-          (response.status === 404 ? "Endpoint not found. Check API route structure." : response.statusText) || 
+        if (response.status === 401) {
+          this.logout(); // clear token if unauthorized
+          throw new Error("Session expired. Please log in again.");
+        }
+
+        const errorMsg =
+          data?.error ||
+          data?.message ||
+          (response.status === 404
+            ? "Endpoint not found. Check API route structure."
+            : response.statusText) ||
           "Request failed";
+
         throw new Error(errorMsg);
       }
 
@@ -69,17 +83,18 @@ class ApiService {
           "Invalid API URL or server error. Check VITE_API_URL in .env."
         );
       }
+
       console.error("API Request failed:", error);
       throw error;
     }
   }
 
-  // 🔹 REGISTER - Fixed route structure and TypeScript issues
+  // 🔹 REGISTER
   async register(userData: {
     fullName: string;
     email: string;
     phone: string;
-    password: string;  // Now required (handled by frontend validation)
+    password: string;
     doorNumber: string;
     buildingName?: string;
     street: string;
@@ -92,7 +107,7 @@ class ApiService {
       user: any;
       token: string;
       error?: string;
-      message?: string; // ✅ Added message field
+      message?: string;
     }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(userData),
@@ -105,14 +120,14 @@ class ApiService {
     return response;
   }
 
-  // 🔹 LOGIN - Fixed error message handling
+  // 🔹 LOGIN
   async login(email: string, password: string) {
     const response = await this.request<{
       success: boolean;
       user: any;
       token: string;
       error?: string;
-      message?: string; // ✅ Added message field
+      message?: string;
     }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -125,37 +140,37 @@ class ApiService {
     return response;
   }
 
-  // 🔹 FORGOT PASSWORD - Fixed route structure
+  // 🔹 FORGOT PASSWORD
   async forgotPassword(email: string) {
-    return await this.request<{
-      success: boolean;
-      message: string;
-    }>("/api/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
+    return await this.request<{ success: boolean; message: string }>(
+      "/api/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }
+    );
   }
 
-  // 🔹 RESET PASSWORD - Fixed route structure
+  // 🔹 RESET PASSWORD
   async resetPassword(token: string, email: string, password: string) {
-    return await this.request<{
-      success: boolean;
-      message: string;
-    }>("/api/auth/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ token, email, password }),
-    });
+    return await this.request<{ success: boolean; message: string }>(
+      "/api/auth/reset-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ token, email, password }),
+      }
+    );
   }
 
   // 🔹 VERIFY RESET TOKEN
   async verifyResetToken(token: string, email: string) {
-    return await this.request<{
-      success: boolean;
-      message: string;
-    }>("/api/auth/verify-reset-token", {
-      method: "POST",
-      body: JSON.stringify({ token, email }),
-    });
+    return await this.request<{ success: boolean; message: string }>(
+      "/api/auth/verify-reset-token",
+      {
+        method: "POST",
+        body: JSON.stringify({ token, email }),
+      }
+    );
   }
 
   // 🔹 PROFILE
@@ -203,23 +218,34 @@ class ApiService {
     serviceType?: string;
     pickupDate: string;
   }) {
-    return await this.request<{ success: boolean; booking: any }>("/api/bookings", {
-      method: "POST",
-      body: JSON.stringify(bookingData),
-    });
+    return await this.request<{ success: boolean; booking: any }>(
+      "/api/bookings",
+      {
+        method: "POST",
+        body: JSON.stringify(bookingData),
+      }
+    );
   }
 
   async getUserBookings() {
-    return await this.request<{ success: boolean; bookings: any[] }>("/api/bookings");
+    return await this.request<{ success: boolean; bookings: any[] }>(
+      "/api/bookings"
+    );
   }
 
   async getBookingById(id: string) {
-    return await this.request<{ success: boolean; booking: any }>(`/api/bookings/${id}`);
+    return await this.request<{ success: boolean; booking: any }>(
+      `/api/bookings/${id}`
+    );
   }
 
   // 🔹 HEALTH CHECK
   async healthCheck() {
-    return await this.request<{ success: boolean; message: string; timestamp: string }>("/health");
+    return await this.request<{
+      success: boolean;
+      message: string;
+      timestamp: string;
+    }>("/health");
   }
 
   // 🔹 AUTH HELPERS
