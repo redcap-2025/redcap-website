@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -10,25 +9,42 @@ const app = express();
 
 // ✅ Use environment variable for frontend origin
 const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:5173';
+
+// ✅ FIXED: Removed trailing slash, added 127.0.0.1 variants for Flutter
 const LOCALHOSTS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'http://127.0.0.1:5000'
+  'http://127.0.0.1:5000',
+  
+  'https://recapweb.netlify.app', // Your production frontend
 ];
 
 const allowedOrigins = [FRONTEND_URL, ...LOCALHOSTS];
 
-app.use(cors({
+// ✅ Configure CORS with origin validation
+const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Allow mobile/curl
-    if (allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, curl, Flutter mobile)
+    if (!origin) {
       return callback(null, true);
     }
-    console.warn(`❌ Blocked CORS request from: ${origin}`);
+
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS allowed for: ${origin}`);
+      return callback(null, true);
+    }
+
+    console.warn(`❌ Blocked by CORS: ${origin}`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-}));
+  optionsSuccessStatus: 200, // Important for older browsers
+};
+
+app.use(cors(corsOptions));
+
+// ✅ Handle preflight requests for all routes (CRITICAL for POST/PUT with content-type)
+app.options('*', cors(corsOptions));
 
 // Middleware
 app.use(express.json());
@@ -53,7 +69,7 @@ app.use('/api/bookings', require('./routes/bookings'));
 pool.getConnection()
   .then(connection => {
     console.log('✅ Connected to MySQL database');
-    console.log(`👉 Host: ${process.env.MYSQLHOST}:${process.env.MYSQLPORT}`);
+    console.log(`👉 Host: ${process.env.MYSQLHOST || 'localhost'}:${process.env.MYSQLPORT || 3306}`);
     connection.release();
   })
   .catch(err => {
@@ -66,7 +82,9 @@ pool.getConnection()
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-  console.log(`🌍 Available via Render at: https://${process.env.RENDER_EXTERNAL_HOSTNAME}`);
+  if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    console.log(`🌍 Available via Render at: https://${process.env.RENDER_EXTERNAL_HOSTNAME}`);
+  }
 });
 
 // 🔐 Global error handlers

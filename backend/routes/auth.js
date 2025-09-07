@@ -1,4 +1,3 @@
-// routes/authRoutes.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -21,15 +20,43 @@ const FRONTEND_URL = process.env.FRONTEND_URL?.trim();
 if (!FRONTEND_URL) {
   console.warn("🔶 WARNING: FRONTEND_URL is not set. Using fallback.");
 }
-const FINAL_FRONTEND_URL = FRONTEND_URL || "https://recapweb.netlify.app"; // ✅ Fixed: no trailing spaces
+const FINAL_FRONTEND_URL = FRONTEND_URL || "https://recapweb.netlify.app";
 console.log(`🌐 Frontend URL: ${FINAL_FRONTEND_URL}`);
 
-// ✅ Health check
+// ==================== Health Check Endpoints ====================
+
+// General auth service health
 router.get("/health", (req, res) => {
   res.json({ success: true, message: "Auth service is running" });
 });
 
-// 🔹 REGISTER
+// Health check for Register route
+router.get("/health/register", (req, res) => {
+  res.json({ success: true, message: "Register endpoint is reachable" });
+});
+
+// Health check for Login route
+router.get("/health/login", (req, res) => {
+  res.json({ success: true, message: "Login endpoint is reachable" });
+});
+
+// Health check for Forgot Password route
+router.get("/health/forgot-password", (req, res) => {
+  res.json({ success: true, message: "Forgot Password endpoint is reachable" });
+});
+
+// Health check for Reset Password route
+router.get("/health/reset-password", (req, res) => {
+  res.json({ success: true, message: "Reset Password endpoint is reachable" });
+});
+
+// Health check for Verify Reset Token route
+router.get("/health/verify-reset-token", (req, res) => {
+  res.json({ success: true, message: "Verify Reset Token endpoint is reachable" });
+});
+
+// ===================== Auth Routes =====================
+
 router.post("/register", async (req, res) => {
   try {
     const {
@@ -122,7 +149,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// 🔹 LOGIN
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -159,7 +185,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// 🔹 FORGOT PASSWORD
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -173,7 +198,7 @@ router.post("/forgot-password", async (req, res) => {
 
     const [users] = await db.execute("SELECT id, fullName FROM users WHERE email = ?", [email]);
     if (users.length === 0) {
-      // ✅ Security: Don't reveal non-existence
+      // Security: Don't reveal non-existence
       return res.json({
         success: true,
         message: "If your email is registered, you'll receive a reset link.",
@@ -190,10 +215,8 @@ router.post("/forgot-password", async (req, res) => {
       [resetTokenHash, resetTokenExpiration, user.id]
     );
 
-    // ✅ FIXED: Use FINAL_FRONTEND_URL, not REACT_APP_FRONTEND_URL
     const resetUrl = `${FINAL_FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
-    // 🔑 DEV: Log reset link only in dev
     if (process.env.NODE_ENV !== "production") {
       console.log("🔑 Reset link:", resetUrl);
     }
@@ -203,10 +226,8 @@ router.post("/forgot-password", async (req, res) => {
       console.log(`✅ Password reset email sent to ${email}`);
     } catch (emailErr) {
       console.error("📧 Failed to send email:", emailErr.message);
-      // Continue — don't expose email failure
     }
 
-    // ✅ Always return generic success
     return res.json({
       success: true,
       message: "If your email is registered, you'll receive a reset link.",
@@ -221,7 +242,6 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// 🔹 RESET PASSWORD
 router.post("/reset-password", async (req, res) => {
   const { token, email, password } = req.body;
 
@@ -283,7 +303,6 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
-// 🔹 VERIFY RESET TOKEN
 router.post("/verify-reset-token", async (req, res) => {
   try {
     const { token, email } = req.body;
