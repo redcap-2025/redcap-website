@@ -97,3 +97,6 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('🔥 Unhandled Rejection:', reason);
   process.exit(1);
 });
+
+const listEndpoints = require("express-list-endpoints");
+console.log(listEndpoints(app));
