@@ -17,7 +17,7 @@ const LOCALHOSTS = [
   'http://127.0.0.1:5000',
   'http://localhost:49212',
   'http://localhost:8081',
-  'http://localhost:52735',
+  'http://localhost:49685',
   
   
   'https://recapweb.netlify.app', // Your production frontend
